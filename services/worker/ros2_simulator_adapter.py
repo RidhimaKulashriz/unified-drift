@@ -33,6 +33,13 @@ def execute_ros2_simulation(output_dir: Path, duration: int = 30) -> dict[str, A
     if not install_setup.exists():
         if not colcon:
             raise RuntimeError("colcon is required to build the upstream ROS2 workspace")
+        # The upstream repository may contain a partial install from a killed
+        # build.  In that state ament_cmake_symlink_install refuses to replace
+        # an existing regular file/directory (the common line-105 failure).
+        # These directories are generated workspace state, so remove them
+        # before the first build rather than reusing a broken overlay.
+        for generated in ("build", "install", "log"):
+            shutil.rmtree(REPO_SRC / generated, ignore_errors=True)
         build = subprocess.run(
             [colcon, "build", "--symlink-install"],
             cwd=str(REPO_SRC), capture_output=True, text=True,
