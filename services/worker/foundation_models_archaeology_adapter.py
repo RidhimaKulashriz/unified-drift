@@ -1,12 +1,13 @@
-"""Adapter for Foundation Models Archaeology.
+"""Adapter for the upstream FoundationModelsArchaeology notebooks.
 
-This adapter provides access to foundation model experiments for archaeological detection
-in satellite imagery and LiDAR data. The repository contains Jupyter notebooks for
-various experiments using GPT, Gemini, and SAM models.
+The upstream project publishes five executable Google Colab notebooks. This
+adapter runs the selected notebook locally/inside the remote worker with
+nbconvert. It never claims success merely because a notebook exists.
 """
 from __future__ import annotations
 
 import os
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -14,60 +15,63 @@ REPO_SRC = Path(__file__).resolve().parents[2] / "vendor" / "foundation-models-a
 
 
 def list_experiments() -> dict[str, Any]:
-    """List available foundation model experiments."""
     if not REPO_SRC.exists():
         raise FileNotFoundError(f"Foundation Models Archaeology repository not found: {REPO_SRC}")
-    
     experiments = []
-    experiments_dir = REPO_SRC
-    
-    # Discover experiment notebooks
-    for exp_dir in experiments_dir.iterdir():
-        if exp_dir.is_dir() and exp_dir.name.startswith("Experiment_"):
-            notebooks = list(exp_dir.glob("*.ipynb"))
-            if notebooks:
-                experiments.append({
-                    "name": exp_dir.name,
-                    "path": str(exp_dir),
-                    "notebooks": [nb.name for nb in notebooks],
-                })
-    
+    for exp_dir in sorted(REPO_SRC.glob("Experiment_*")):
+        if not exp_dir.is_dir():
+            continue
+        notebooks = sorted(exp_dir.glob("*.ipynb"))
+        if notebooks:
+            experiments.append({"name": exp_dir.name, "path": str(exp_dir), "notebooks": [p.name for p in notebooks]})
     return {
         "adapterId": "foundation-models-archaeology",
         "repository": "vendor/foundation-models-archaeology",
-        "model": "Foundation Models for Archaeological Remote Sensing",
-        "executionStatus": "FULLY RUNNING",
-        "ran": True,
+        "executionStatus": "READY",
+        "ran": False,
         "experiments": experiments,
-        "capabilities": [
-            "Bavarian castles detection in satellite imagery",
-            "Cambodian temples detection in satellite imagery",
-            "English hillforts detection in LiDAR",
-            "SAM segmentation for archaeological features",
-            "Potsherd detection from drone imagery",
-        ],
-        "note": "Foundation Models Archaeology uses notebook-based workflows with GPT, Gemini, and SAM models. Use experiments interactively for research and exploration.",
     }
 
 
 def run_experiment(experiment_name: str, input_data: Path, output_dir: Path) -> dict[str, Any]:
-    """Run a specific foundation model experiment (requires notebook execution)."""
+    """Execute one real upstream notebook and save the executed notebook."""
     exp_dir = REPO_SRC / experiment_name
-    if not exp_dir.exists():
-        raise ValueError(f"Experiment not found: {experiment_name}")
-    
+    if not exp_dir.is_dir():
+        raise ValueError(f"Unknown experiment: {experiment_name}")
+    notebooks = sorted(exp_dir.glob("*.ipynb"))
+    if not notebooks:
+        raise FileNotFoundError(f"No notebook found in {exp_dir}")
+    notebook = notebooks[0]
     output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Note: Actual notebook execution would require papermill or nbconvert
-    # This is a placeholder indicating the experiment is available
+    executed = output_dir / f"{notebook.stem}_executed.ipynb"
+    try:
+        check = subprocess.run(["jupyter", "nbconvert", "--version"], capture_output=True, text=True, timeout=60)
+    except FileNotFoundError as exc:
+        raise RuntimeError("jupyter/nbconvert is required on the execution worker") from exc
+    if check.returncode != 0:
+        raise RuntimeError(check.stderr or "nbconvert is unavailable")
+
+    env = os.environ.copy()
+    env["DRIFT_INPUT_DATA"] = str(input_data)
+    result = subprocess.run(
+        ["jupyter", "nbconvert", "--to", "notebook", "--execute", str(notebook), "--output", executed.name],
+        cwd=str(exp_dir),
+        capture_output=True,
+        text=True,
+        timeout=1800,
+        env=env,
+    )
+    if result.returncode != 0 or not executed.exists():
+        raise RuntimeError(result.stderr[-6000:] or result.stdout[-6000:] or "upstream notebook execution failed")
     return {
         "adapterId": "foundation-models-archaeology",
         "repository": "vendor/foundation-models-archaeology",
-        "model": f"Foundation Models / {experiment_name}",
+        "model": notebook.name,
         "executionStatus": "FULLY RUNNING",
         "ran": True,
         "experiment": experiment_name,
         "input": str(input_data),
-        "outputDir": str(output_dir),
-        "note": f"Experiment {experiment_name} is available. Execute the corresponding Jupyter notebook interactively or with papermill for automated runs.",
+        "artifact": str(executed),
+        "command": "jupyter nbconvert --to notebook --execute",
+        "stdout": result.stdout[-4000:],
     }
