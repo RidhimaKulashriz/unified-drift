@@ -55,6 +55,9 @@ def ok(repo: str, mode: str, artifact: Path | None, detail: str, **extra: Any) -
         "detail": detail,
         "artifact": str(artifact) if artifact else None,
         "timestamp": now(),
+        # Non-detector repositories keep this empty; detector adapters fill it
+        # only with records returned by their upstream implementation.
+        "findingRecords": extra.pop("findingRecords", []),
         **extra,
     }
 
@@ -279,7 +282,7 @@ def rgbt(output: Path, rgb: Path | None, thermal_video: Path | None) -> dict[str
             "findings": result.get("findings", []),
             "artifact": str(artifact),
         })
-        return ok("rgbt-fusion-drone-sar", "rgbt-fusion", report, "Real ONNX fusion model executed", findings=len(result.get("findings", [])))
+        return ok("rgbt-fusion-drone-sar", "rgbt-fusion", report, "Real ONNX fusion model executed", findings=len(result.get("findings", [])), findingRecords=result.get("findings", []))
     except Exception as exc:
         return fail("rgbt-fusion-drone-sar", "rgbt-fusion", "FAILED", str(exc))
 
@@ -291,7 +294,7 @@ def geolocation(output: Path, srt: Path | None, findings: list[dict[str, Any]]) 
         from run_pipeline import run_real_geolocation_adapter
         result = run_real_geolocation_adapter(srt, findings, 640, 512)
         artifact = write_json(output / "geolocation_execution.json", result)
-        return ok("uav-thermal-person-geolocation", "geolocation", artifact, "Upstream SRTParser + GeoCalculator executed", projected=result.get("findingsProjected", 0))
+        return ok("uav-thermal-person-geolocation", "geolocation", artifact, "Upstream SRTParser + GeoCalculator executed", projected=result.get("findingsProjected", 0), findingRecords=findings)
     except Exception as exc:
         return fail("uav-thermal-person-geolocation", "geolocation", "FAILED", str(exc))
 
