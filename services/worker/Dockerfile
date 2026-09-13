@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM ros:humble-ros-base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -8,6 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg git curl ca-certificates build-essential libglib2.0-0 libgl1 \
+    ros-humble-gazebo-ros-pkgs ros-humble-xacro \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/services/worker
@@ -40,4 +41,4 @@ RUN mkdir -p /app/vendor /app/models && \
     cp /var/lib/drift/tdm-cache/files/rgbt-onnx/fusion_progressive_finetune.onnx /app/models/fusion_progressive_finetune.onnx && \
     python verify_tdm_assets.py
 
-CMD ["python", "gpu_worker.py"]
+CMD ["bash", "-lc", "source /opt/ros/humble/setup.bash && exec python gpu_worker.py"]
