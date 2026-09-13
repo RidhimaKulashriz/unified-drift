@@ -82,6 +82,27 @@ def write_inline(encoded: str | None, target: Path, label: str) -> Path | None:
     return target
 
 
+def publish_visual_artifacts(summary: dict[str, Any], run_id: str) -> None:
+    """Keep real annotated frames available after the temporary job directory is removed."""
+    if not s3_client:
+        return
+    for record in summary.get("results", []):
+        artifact = record.get("artifact")
+        if not artifact:
+            continue
+        root = Path(str(artifact))
+        candidates = [root] if root.is_file() else list(root.rglob("*.jpg")) + list(root.rglob("*.jpeg")) + list(root.rglob("*.png"))
+        candidates = [path for path in candidates if path.is_file() and path.stat().st_size > 0]
+        if not candidates:
+            continue
+        image = max(candidates, key=lambda path: path.stat().st_size)
+        repository = str(record.get("repository", "adapter")).replace("/", "-")
+        key = f"results/{run_id}/{repository}/annotated-{image.name}"
+        content_type = "image/png" if image.suffix.lower() == ".png" else "image/jpeg"
+        s3_client.upload_file(str(image), OBJECT_STORAGE_BUCKET, key, ExtraArgs={"ContentType": content_type})
+        record["visualArtifactUri"] = f"s3://{OBJECT_STORAGE_BUCKET}/{key}"
+
+
 def normalize_summary(summary: dict[str, Any]) -> dict[str, Any]:
     """Expose the all-12 executor through the dashboard's stable mission contract."""
     records = summary.get("results", [])
@@ -99,6 +120,7 @@ def normalize_summary(summary: dict[str, Any]) -> dict[str, Any]:
             "contribution": record.get("detail", ""),
             "ran": bool(record.get("ran")),
             "artifact": record.get("artifact"),
+            "visualArtifactUri": record.get("visualArtifactUri"),
         })
         for finding in record.get("findingRecords", []) or []:
             findings.append(finding)
@@ -165,6 +187,7 @@ def process_job(message: dict[str, Any]) -> bool:
         args.samples = int(message.get("samples", 3))
         summary = execute_all(args)
         summary["runId"] = run_id
+        publish_visual_artifacts(summary, run_id)
         normalized = normalize_summary(summary)
         update_job(run_id, "completed", 1.0, "completed", normalized)
         return True

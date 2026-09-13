@@ -50,3 +50,4 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
 .adapter-link strong { font-size:10px; font-weight:500; }
 .adapter-link small { margin-top:3px; color:#686863; font:8px 'DM Mono', monospace; }
 .adapter-link b { color:#d8f59c; font:10px 'DM Mono', monospace; font-weight:400; }
+.annotated-frame { position:absolute; inset:0; z-index:3; object-fit:contain; background:#111; }
