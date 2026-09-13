@@ -225,11 +225,18 @@ def simulated_training(output: Path, dem: Path | None, streams: Path | None, sam
 
 def arran(output: Path, dataset: Path | None) -> dict[str, Any]:
     repo = "arran"
-    root = VENDOR / repo
     if dataset is None:
         return fail(repo, "benchmark", "INPUT_REQUIRED", "Provide Arran benchmark data or a prediction directory")
     if not dataset.exists():
         return fail(repo, "benchmark", "INPUT_NOT_FOUND", str(dataset))
+    try:
+        from benchmark_adapter import execute_benchmarkevaluation
+        result = execute_benchmarkevaluation(dataset, output)
+        artifact = Path(result.get("artifact")) if result.get("artifact") else output
+        return ok(repo, "benchmark", artifact, "Real Arran annotations parsed for evaluation", model=result.get("model"), classes=result.get("classes", []), annotationCount=result.get("annotationCount", 0))
+    except RuntimeError as exc:
+        if "No Arran CSV annotations" not in str(exc):
+            return fail(repo, "benchmark", "FAILED", str(exc))
     files = [p for p in dataset.rglob("*") if p.is_file()]
     extensions: dict[str, int] = {}
     for p in files:
