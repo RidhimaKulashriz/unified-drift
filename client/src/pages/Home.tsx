@@ -81,6 +81,40 @@ async function uploadMedia(file: Blob, name: string) {
   return body.uri as string;
 }
 
+function extractFirstFrame(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    const sourceUrl = URL.createObjectURL(file);
+    video.preload = "auto";
+    video.muted = true;
+    video.playsInline = true;
+    video.src = sourceUrl;
+    const cleanup = () => { URL.revokeObjectURL(sourceUrl); video.remove(); };
+    video.addEventListener("loadeddata", () => {
+      video.currentTime = 0;
+    }, { once: true });
+    video.addEventListener("seeked", () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      if (!canvas.width || !canvas.height) {
+        cleanup();
+        reject(new Error("The uploaded video has no readable video frame."));
+        return;
+      }
+      canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const frame = canvas.toDataURL("image/jpeg", 0.88);
+      cleanup();
+      resolve(frame);
+    }, { once: true });
+    video.addEventListener("error", () => {
+      cleanup();
+      reject(new Error("Could not decode the first frame of the uploaded video."));
+    }, { once: true });
+    video.load();
+  });
+}
+
 function storageUrl(uri?: string) {
   if (!uri) return "";
   const apiBase = (import.meta.env.VITE_DRIFT_API_URL || "https://drift-orchestrator.onrender.com").replace(/\/$/, "");
@@ -130,6 +164,7 @@ export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
+  const [firstFrame, setFirstFrame] = useState("");
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState<Stage>("idle");
@@ -156,10 +191,15 @@ export default function Home() {
     }).catch(() => undefined);
   }, []);
 
-  const handleFile = (next: File | undefined) => {
+  const handleFile = async (next: File | undefined) => {
     if (!next) return;
     if (preview) URL.revokeObjectURL(preview);
-    setFile(next); setPreview(URL.createObjectURL(next)); setProgress(0); setStage("idle"); setResult(null); setError("");
+    setFile(next); setFirstFrame(""); setPreview(URL.createObjectURL(next)); setProgress(0); setStage("idle"); setResult(null); setError("");
+    try {
+      setFirstFrame(await extractFirstFrame(next));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not read the first video frame.");
+    }
   };
 
   const runMission = async () => {
@@ -171,7 +211,9 @@ export default function Home() {
       const tdmInput: Record<string, string> = {};
       if (tdmMode) {
         const rgbResponse = await fetch(demoVideoMode ? "/tdm/delhi-collapse-demo.mp4" : "/tdm/rgb-video.mp4");
-        videoUri = await uploadMedia(await rgbResponse.blob(), demoVideoMode ? "delhi-collapse-demo.mp4" : "tdm-rgb-video.mp4");
+        const rgbVideo = await rgbResponse.blob();
+        setFirstFrame(await extractFirstFrame(rgbVideo));
+        videoUri = await uploadMedia(rgbVideo, demoVideoMode ? "delhi-collapse-demo.mp4" : "tdm-rgb-video.mp4");
         for (const [field, _label, filename] of tdmAssets) {
           const response = await fetch(`/tdm/${filename}`);
           tdmInput[field] = await uploadMedia(await response.blob(), `tdm-${filename}`);
@@ -225,7 +267,7 @@ export default function Home() {
           <section className="module-strip"><div className="strip-label"><p className="eyebrow">02 / MODULES</p><span>{activeCount} enabled</span></div>{modules.map((module) => { const Icon = module.icon; const isOn = enabled[module.id]; return <button key={module.id} className={isOn ? "module-card on" : "module-card"} onClick={() => setEnabled((current) => ({ ...current, [module.id]: !current[module.id] }))}><div className="module-top"><Icon size={17} /><span className={isOn ? "toggle on" : "toggle"}>{isOn ? <Check size={10} /> : <X size={10} />}</span></div><strong>{module.label}</strong><small>{module.detail}</small><code>{statusFor(module.id)}</code></button>; })}</section>
           <section className="demo-lab"><div className="gallery-heading"><div><p className="eyebrow">REAL ML FINDINGS / 12 REPOSITORIES</p><h3>Detection mechanisms and actual outputs</h3></div><span>PROVENANCE-PRESERVED · NO FABRICATED FINDINGS</span></div><div className="demo-grid">{modules.map((module) => { const spec = demoSpecs[module.id]; return <article className="demo-card" key={module.id}>{spec.preview ? <img className="demo-preview" src={spec.preview} alt={`${module.label} official sample output`} /> : <div className="demo-preview visual-empty"><span>No official image artifact</span><small>Expected output is {module.output.toLowerCase()}.</small></div>}<div className="demo-card-top"><strong>{module.label}</strong><span className={spec.ready ? "demo-ready" : "demo-gated"}>{module.kind}</span></div><p><b>Mechanism:</b> {module.mechanism}</p><p><b>Real output:</b> {module.output}</p><p><b>Input:</b> {spec.input}</p>{spec.preview && <small className="demo-caption">Official upstream sample output; not this run</small>}<div className="demo-card-actions"><button className="outline-button" onClick={() => { setTdmPipelineId(module.id); setTdmMode(true); setActiveTab("pipeline"); }}>Select pipeline</button><a className="demo-source" href={spec.source} target="_blank" rel="noreferrer">official source ↗</a></div></article>; })}</div></section>
           {result && <section className="visual-gallery"><div className="gallery-heading"><div><p className="eyebrow">VISUAL OUTPUTS / ALL 12 REPOSITORIES</p><h3>Judge-ready evidence gallery</h3></div><span>{visualAdapters.filter((adapter) => adapter.visualArtifactUri).length}/12 annotated artifacts</span></div><div className="gallery-grid">{visualAdapters.map((adapter) => { const imageUrl = storageUrl(adapter.visualArtifactUri); const findingsForAdapter = visibleFindings.filter((finding) => finding.source?.repository?.toLowerCase().includes(adapter.repository.toLowerCase())); return <button key={adapter.adapterId} className={selectedAdapter?.adapterId === adapter.adapterId ? "visual-card active" : "visual-card"} onClick={() => { setSelectedAdapterId(adapter.adapterId); setActiveTab("evidence"); }}>{imageUrl ? <img src={imageUrl} alt={`${topicFor(adapter.adapterId)} annotated output`} /> : <div className="visual-empty"><Database size={20} /><span>No visual artifact</span><small>{adapter.reason || "Adapter returned no image output"}</small></div>}<div className="visual-card-meta"><strong>{topicFor(adapter.adapterId)}</strong><small>{adapter.executionStatus} · {findingsForAdapter.length} detections</small></div></button>; })}</div></section>}
-          <section className="analysis-grid"><div className="viewer-panel"><div className="panel-head"><div><p className="eyebrow">03 / LIVE EVIDENCE</p><h3>{selectedAdapter ? `${topicFor(selectedAdapter.adapterId)} detection frame` : "Frame analysis"}</h3></div><span className="frame-counter"><Video size={13} /> {result ? `${selectedFindings.length} selected detections` : "awaiting worker"}</span></div><div className="video-stage">{preview ? <video src={preview} controls muted className="uploaded-video" /> : <div className="empty-video"><FileVideo size={30} /><span>Preview appears here after upload</span><small>Real annotated output is written by the worker</small></div>}{detectionBoxes.map((finding, index) => { const box = finding.bboxPixels as number[]; const [x1, y1, x2, y2] = box; return <div key={`${finding.label}-${index}`} className="detection-box" style={{ left: `${(x1 / 640) * 100}%`, top: `${(y1 / 360) * 100}%`, width: `${((x2 - x1) / 640) * 100}%`, height: `${((y2 - y1) / 360) * 100}%`, borderColor: "#d8f59c" }}><span>{finding.label} {Number(finding.confidence).toFixed(2)}</span></div>; })}{annotatedImageUrl && <img src={annotatedImageUrl} className="uploaded-video annotated-frame" alt={`${selectedAdapter ? topicFor(selectedAdapter.adapterId) : "ML"} annotated detection frame`} />}</div><div className="scrub"><span>0%</span><div className="scrub-line"><div style={{ width: `${progress}%` }} /></div><span>{progress}%</span></div></div>
+          <section className="analysis-grid"><div className="viewer-panel"><div className="panel-head"><div><p className="eyebrow">03 / LIVE EVIDENCE</p><h3>{selectedAdapter ? `${topicFor(selectedAdapter.adapterId)} detection frame` : "Frame analysis"}</h3></div><span className="frame-counter"><Video size={13} /> {result ? `${selectedFindings.length} selected detections` : "awaiting worker"}</span></div><div className="video-stage">{firstFrame ? <img src={firstFrame} className="uploaded-video first-frame" alt="First frame of the uploaded video" /> : preview ? <video src={preview} controls muted className="uploaded-video" /> : <div className="empty-video"><FileVideo size={30} /><span>Preview appears here after upload</span><small>Real annotated output is written by the worker</small></div>}{detectionBoxes.map((finding, index) => { const box = finding.bboxPixels as number[]; const [x1, y1, x2, y2] = box; return <div key={`${finding.label}-${index}`} className="detection-box" style={{ left: `${(x1 / 640) * 100}%`, top: `${(y1 / 360) * 100}%`, width: `${((x2 - x1) / 640) * 100}%`, height: `${((y2 - y1) / 360) * 100}%`, borderColor: "#d8f59c" }}><span>{finding.label} {Number(finding.confidence).toFixed(2)}</span></div>; })}{annotatedImageUrl && <img src={annotatedImageUrl} className="uploaded-video annotated-frame" alt={`${selectedAdapter ? topicFor(selectedAdapter.adapterId) : "ML"} annotated detection frame`} />}</div><div className="scrub"><span>0%</span><div className="scrub-line"><div style={{ width: `${progress}%` }} /></div><span>{progress}%</span></div></div>
             <div className="signal-panel"><div className="panel-head"><div><p className="eyebrow">04 / EXECUTION LEDGER</p><h3>{activeTab === "evidence" ? `${selectedAdapter ? topicFor(selectedAdapter.adapterId) : "Findings"} detections` : "Topic execution status"}</h3></div><span className="live-pill">{running ? "PROCESSING" : result ? "VERIFIED" : "STAGED"}</span></div><div className="signal-list">{activeTab === "evidence" && selectedFindings.length ? selectedFindings.map((finding, index) => <div className="signal-item" key={`${finding.label}-${index}`}><span className="signal-icon"><Radar size={15} /></span><div><strong>{finding.label}</strong><small>{finding.source.model} · {String(finding.source.repository)} · provenance preserved</small></div><b>{Number(finding.confidence).toFixed(2)}</b></div>) : result && selectedAdapter ? <div className="signal-item"><span className="signal-icon"><Database size={15} /></span><div><strong>{selectedAdapter.executionStatus}</strong><small>{selectedAdapter.reason || "No detection records returned by this adapter."}</small></div><b className={selectedAdapter.ran ? "good" : "muted"}>{selectedAdapter.findingRecords?.length ?? 0}</b></div> : result ? result.adapters.map((adapter) => <div className="signal-item" key={adapter.adapterId}><span className="signal-icon"><Database size={15} /></span><div><strong>{topicFor(adapter.adapterId)}</strong><small>{adapter.model} · {adapter.reason}</small></div><b className={adapter.ran ? "good" : "muted"}>{adapter.executionStatus}</b></div>) : <div className="signal-item"><span className="signal-icon"><Database size={15} /></span><div><strong>No worker result yet</strong><small>Upload input and run the actual pipeline</small></div><b>—</b></div>}</div><div className="signal-footer"><span><Database size={13} /> {selectedFindings.length} detections / provenance-preserved JSON</span><button className="download-button"><Download size={13} /> export bundle</button></div></div></section>
           {error && <div className="error-banner"><X size={15} /><span>{error}</span></div>}
           <section className="footer-run"><div className="run-status"><span className={running ? "pulse active" : stage === "error" ? "pulse error" : "pulse"} /><div><strong>{stageLabel}</strong><small>{result ? `${result.fusion.outputFindingCount} outputs fused; ${executed.length} repository execution records` : "The worker records exact repository, model, status, output, and contribution."}</small></div></div><div className="run-meter"><span>{progress}%</span><div><div style={{ width: `${progress}%` }} /></div></div></section>
