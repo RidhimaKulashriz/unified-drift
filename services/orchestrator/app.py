@@ -165,13 +165,6 @@ def submit_run(mission: MissionSubmission) -> dict[str, str]:
         redis_client.rpush(WORKER_QUEUE_NAME, json.dumps(queue_payload))
     return {"run_id": run_id, "status": "queued"}
 
-@app.get("/v1/runs/{run_id}")
-def get_run(run_id: str) -> JobStatus:
-    raw = redis_client.get(f"job:{run_id}")
-    if not raw:
-        raise HTTPException(status_code=404, detail="Run not found")
-    return JobStatus(**json.loads(raw))
-
 @app.get("/v1/runs/latest")
 def get_latest_completed_run() -> Any:
     latest: dict[str, Any] | None = None
@@ -192,6 +185,13 @@ def get_latest_completed_run() -> Any:
     if latest is None:
         return {"status": "empty", "message": "No completed stored run is available yet"}
     return JobStatus(**latest)
+
+@app.get("/v1/runs/{run_id}")
+def get_run(run_id: str) -> JobStatus:
+    raw = redis_client.get(f"job:{run_id}")
+    if not raw:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return JobStatus(**json.loads(raw))
 
 @app.get("/v1/runs/{run_id}/events")
 async def events(run_id: str):
