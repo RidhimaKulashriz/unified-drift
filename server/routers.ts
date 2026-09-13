@@ -6,7 +6,7 @@ import { z } from "zod";
 
 const ORCHESTRATOR_URL = process.env.DRIFT_ORCHESTRATOR_URL ?? "https://drift-orchestrator.onrender.com";
 
-async function submitToOrchestrator(input: { videoBase64: string; fileName: string; thermalVideoBase64?: string }) {
+async function submitToOrchestrator(input: { videoBase64: string; fileName: string; thermalVideoBase64?: string; enabledModules?: string[] }) {
   const response = await fetch(`${ORCHESTRATOR_URL}/v1/runs`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -15,6 +15,7 @@ async function submitToOrchestrator(input: { videoBase64: string; fileName: stri
       video_file_name: input.fileName,
       thermal_video_base64: input.thermalVideoBase64,
       thermal_video_file_name: input.thermalVideoBase64 ? `thermal-${input.fileName}` : undefined,
+      enabled_modules: input.enabledModules ?? [],
     }),
   });
   const text = await response.text();
@@ -23,7 +24,7 @@ async function submitToOrchestrator(input: { videoBase64: string; fileName: stri
 }
 
 async function waitForRun(runId: string) {
-  const deadline = Date.now() + 15000;
+  const deadline = Date.now() + 10 * 60 * 1000;
   while (Date.now() < deadline) {
     const response = await fetch(`${ORCHESTRATOR_URL}/v1/runs/${encodeURIComponent(runId)}`);
     if (!response.ok) throw new Error(`Run status ${response.status}: ${await response.text()}`);
@@ -32,7 +33,7 @@ async function waitForRun(runId: string) {
     if (job.status === "failed") throw new Error(job.error ?? "Remote worker failed");
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
-  return { runId, status: "queued", findings: [], adapters: [], fusion: { outputFindingCount: 0 } };
+  throw new Error("The worker is still processing this mission after 10 minutes. Check the run in the orchestrator before retrying.");
 }
 
 export const appRouter = router({
@@ -50,6 +51,7 @@ export const appRouter = router({
       videoBase64: z.string().min(10),
       fileName: z.string().min(1).max(160),
       thermalVideoBase64: z.string().optional(),
+      enabledModules: z.array(z.string()).optional(),
     })).mutation(async ({ input }) => {
       const queued = await submitToOrchestrator(input);
       const results = await waitForRun(queued.run_id);

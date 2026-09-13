@@ -25,10 +25,18 @@ import {
 import { trpc } from "@/lib/trpc";
 
 const modules = [
-  { id: "thermal", label: "Thermal geolocation", repo: "uav-thermal-person-geolocation", icon: Flame, detail: "thermal + SRT telemetry" },
-  { id: "fusion", label: "RGB + thermal fusion", repo: "RGBT-Fusion-Drone-SAR", icon: Layers3, detail: "paired-input fusion" },
-  { id: "detection", label: "Aerial detection", repo: "Aerial-Thermal-Detection-RT-DETRv2-and-YOLOv12", icon: Radar, detail: "YOLOv12 + RT-DETRv2" },
-  { id: "archaeology", label: "Archaeology", repo: "ADAF + FoundationModelsArchaeology", icon: ScanSearch, detail: "ALS / satellite data" },
+  { id: "mustatil", label: "GIS AI workspace", repo: "Mustatil", icon: ScanSearch, detail: "images / GeoTIFF / satellite" },
+  { id: "foundation-models-archaeology", label: "Zero-shot archaeology", repo: "Foundation Models Archaeology", icon: ScanSearch, detail: "satellite / LiDAR / notebooks" },
+  { id: "adaf", label: "Archaeological features", repo: "ADAF", icon: ScanSearch, detail: "ALS / LiDAR / GeoTIFF" },
+  { id: "arran", label: "Archaeology benchmark", repo: "Arran", icon: Activity, detail: "dataset evaluation" },
+  { id: "simulated-training-data", label: "Synthetic training data", repo: "Simulated Training Data", icon: Layers3, detail: "DEM + stream vectors" },
+  { id: "uav-thermal-person-geolocation", label: "Thermal GPS geolocation", repo: "UAV Thermal Person Geolocation", icon: Flame, detail: "thermal video + SRT" },
+  { id: "drone-tracker", label: "Drone object tracking", repo: "Drone Tracker", icon: Radar, detail: "RGB video + tracking model" },
+  { id: "aerial-thermal-detection", label: "Thermal aerial detection", repo: "Aerial Thermal Detection", icon: Flame, detail: "YOLOv12 + RT-DETRv2" },
+  { id: "aerial-thermal-sar-detection-demo", label: "Thermal SAR comparison", repo: "Aerial Thermal SAR Demo", icon: Radar, detail: "dual thermal models" },
+  { id: "rgbt-fusion-drone-sar", label: "RGB-T fusion", repo: "RGB-T Fusion Drone SAR", icon: Layers3, detail: "synchronized RGB + thermal" },
+  { id: "ros2-disaster-robot-sim", label: "Disaster robot simulation", repo: "ROS2 Disaster Robot Simulator", icon: Activity, detail: "ROS2 + Gazebo" },
+  { id: "drone-control-monitoring-system", label: "Drone ground station", repo: "Drone Control Monitoring", icon: Waves, detail: "MAVLink / telemetry" },
 ];
 
 type Adapter = { adapterId: string; repository: string; model: string; executionStatus: string; reason: string; contribution: string; ran: boolean };
@@ -60,7 +68,7 @@ export default function Home() {
   const [stage, setStage] = useState<Stage>("idle");
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [thermalMode, setThermalMode] = useState(false);
-  const [enabled, setEnabled] = useState<Record<string, boolean>>({ thermal: true, fusion: true, detection: true, archaeology: true });
+  const [enabled, setEnabled] = useState<Record<string, boolean>>(() => Object.fromEntries(modules.map((module) => [module.id, true])));
   const [result, setResult] = useState<MissionResult | null>(null);
   const [error, setError] = useState("");
   const activeCount = useMemo(() => Object.values(enabled).filter(Boolean).length, [enabled]);
@@ -80,7 +88,7 @@ export default function Home() {
     try {
       const videoBase64 = await fileToBase64(file);
       setStage("queued"); setProgress(22);
-      const output = await runMutation.mutateAsync({ videoBase64, fileName: file.name, thermalVideoBase64: thermalMode ? videoBase64 : undefined }) as MissionResult;
+      const output = await runMutation.mutateAsync({ videoBase64, fileName: file.name, thermalVideoBase64: thermalMode ? videoBase64 : undefined, enabledModules: modules.filter((module) => enabled[module.id]).map((module) => module.id) }) as MissionResult;
       setResult(output); setStage("complete"); setProgress(100); setActiveTab("evidence");
     } catch (cause) {
       setStage("error"); setError(cause instanceof Error ? cause.message : "The worker could not complete this mission.");
@@ -92,9 +100,10 @@ export default function Home() {
   const stageLabel = { idle: "Ready for input", uploading: "Preparing media", queued: "Queued for worker", processing: "Executing upstream code", complete: "Verified worker output", error: "Run needs attention" }[stage];
   const statusFor = (moduleId: string) => {
     if (!result) return running ? "QUEUED" : "STAGED";
-    const match = result.adapters.find((item) => item.adapterId.toLowerCase().includes(moduleId));
+    const match = result.adapters.find((item) => item.adapterId.toLowerCase().includes(moduleId.toLowerCase()));
     return match?.executionStatus ?? (enabled[moduleId] ? "NOT REPORTED" : "DISABLED");
   };
+  const topicFor = (adapterId: string) => modules.find((module) => adapterId.toLowerCase().includes(module.id.toLowerCase()))?.label ?? adapterId;
 
   return (
     <main className="drift-shell">
@@ -111,7 +120,7 @@ export default function Home() {
           <section className="ingest-card"><div className="ingest-copy"><div className="number-stamp">01</div><div><p className="eyebrow">INGEST</p><h3>{file ? file.name : "Drop drone footage here"}</h3><p>{file ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · ready for real execution` : "MP4, MOV, AVI · mark thermal only when the source is genuinely thermal"}</p></div></div><div className="ingest-actions"><input ref={inputRef} type="file" accept="video/*" hidden onChange={(event) => handleFile(event.target.files?.[0])} /><button className="outline-button" onClick={() => inputRef.current?.click()}><Upload size={16} />{file ? "Replace footage" : "Choose footage"}</button><button className={thermalMode ? "outline-button active" : "outline-button"} onClick={() => setThermalMode((value) => !value)}><Flame size={15} />{thermalMode ? "Thermal input on" : "Mark as thermal"}</button><button className="primary-button" disabled={!file || running} onClick={runMission}><Play size={15} fill="currentColor" />{running ? "Running real code" : "Run real pipeline"}</button></div></section>
           <section className="module-strip"><div className="strip-label"><p className="eyebrow">02 / MODULES</p><span>{activeCount} enabled</span></div>{modules.map((module) => { const Icon = module.icon; const isOn = enabled[module.id]; return <button key={module.id} className={isOn ? "module-card on" : "module-card"} onClick={() => setEnabled((current) => ({ ...current, [module.id]: !current[module.id] }))}><div className="module-top"><Icon size={17} /><span className={isOn ? "toggle on" : "toggle"}>{isOn ? <Check size={10} /> : <X size={10} />}</span></div><strong>{module.label}</strong><small>{module.detail}</small><code>{statusFor(module.id)}</code></button>; })}</section>
           <section className="analysis-grid"><div className="viewer-panel"><div className="panel-head"><div><p className="eyebrow">03 / LIVE EVIDENCE</p><h3>Frame analysis</h3></div><span className="frame-counter"><Video size={13} /> {result ? `${result.findings.length} normalized findings` : "awaiting worker"}</span></div><div className="video-stage">{preview ? <video src={preview} controls muted className="uploaded-video" /> : <div className="empty-video"><FileVideo size={30} /><span>Preview appears here after upload</span><small>Real annotated output is written by the worker</small></div>}</div><div className="scrub"><span>0%</span><div className="scrub-line"><div style={{ width: `${progress}%` }} /></div><span>{progress}%</span></div></div>
-            <div className="signal-panel"><div className="panel-head"><div><p className="eyebrow">04 / EXECUTION LEDGER</p><h3>{activeTab === "evidence" ? "Findings & provenance" : "Repository contribution"}</h3></div><span className="live-pill">{running ? "PROCESSING" : result ? "VERIFIED" : "STAGED"}</span></div><div className="signal-list">{activeTab === "evidence" && visibleFindings.length ? visibleFindings.map((finding, index) => <div className="signal-item" key={`${finding.label}-${index}`}><span className="signal-icon"><Radar size={15} /></span><div><strong>{finding.label}</strong><small>{finding.source.repository} · {finding.source.model}</small></div><b>{finding.confidence.toFixed(2)}</b></div>) : result ? result.adapters.map((adapter) => <div className="signal-item" key={adapter.adapterId}><span className="signal-icon"><Database size={15} /></span><div><strong>{adapter.repository}</strong><small>{adapter.model} · {adapter.reason}</small></div><b className={adapter.ran ? "good" : "muted"}>{adapter.executionStatus}</b></div>) : <div className="signal-item"><span className="signal-icon"><Database size={15} /></span><div><strong>No worker result yet</strong><small>Upload input and run the actual pipeline</small></div><b>—</b></div>}</div><div className="signal-footer"><span><Database size={13} /> findings / provenance-preserved JSON</span><button className="download-button"><Download size={13} /> export bundle</button></div></div></section>
+            <div className="signal-panel"><div className="panel-head"><div><p className="eyebrow">04 / EXECUTION LEDGER</p><h3>{activeTab === "evidence" ? "Findings & provenance" : "Topic execution status"}</h3></div><span className="live-pill">{running ? "PROCESSING" : result ? "VERIFIED" : "STAGED"}</span></div><div className="signal-list">{activeTab === "evidence" && visibleFindings.length ? visibleFindings.map((finding, index) => <div className="signal-item" key={`${finding.label}-${index}`}><span className="signal-icon"><Radar size={15} /></span><div><strong>{finding.label}</strong><small>{finding.source.model} · provenance preserved</small></div><b>{finding.confidence.toFixed(2)}</b></div>) : result ? result.adapters.map((adapter) => <div className="signal-item" key={adapter.adapterId}><span className="signal-icon"><Database size={15} /></span><div><strong>{topicFor(adapter.adapterId)}</strong><small>{adapter.model} · {adapter.reason}</small></div><b className={adapter.ran ? "good" : "muted"}>{adapter.executionStatus}</b></div>) : <div className="signal-item"><span className="signal-icon"><Database size={15} /></span><div><strong>No worker result yet</strong><small>Upload input and run the actual pipeline</small></div><b>—</b></div>}</div><div className="signal-footer"><span><Database size={13} /> findings / provenance-preserved JSON</span><button className="download-button"><Download size={13} /> export bundle</button></div></div></section>
           {error && <div className="error-banner"><X size={15} /><span>{error}</span></div>}
           <section className="footer-run"><div className="run-status"><span className={running ? "pulse active" : stage === "error" ? "pulse error" : "pulse"} /><div><strong>{stageLabel}</strong><small>{result ? `${result.fusion.outputFindingCount} outputs fused; ${executed.length} repository execution records` : "The worker records exact repository, model, status, output, and contribution."}</small></div></div><div className="run-meter"><span>{progress}%</span><div><div style={{ width: `${progress}%` }} /></div></div></section>
         </section>
