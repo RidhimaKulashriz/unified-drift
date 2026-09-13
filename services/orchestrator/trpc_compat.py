@@ -70,7 +70,7 @@ def register(app, submit_run: Callable[[Any], dict[str, str]], mission_model, ge
                     responses.append(_error("videoUri or videoBase64 and fileName are required", code=-32600, http_status=400))
                     continue
 
-                mission = MissionSubmission(
+                mission = mission_model(
                     execution_mode=data.get("executionMode") or "real-upstream",
                     video_uri=video_uri,
                     video_file_name=file_name,
