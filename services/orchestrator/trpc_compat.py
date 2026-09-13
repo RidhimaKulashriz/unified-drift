@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -93,22 +92,9 @@ def register(app, submit_run: Callable[[Any], dict[str, str]], mission_model, ge
                     enabled_modules=data.get("enabledModules") or [],
                 )
                 queued = submit_run(mission)
-                if get_run is None:
-                    responses.append(_success(queued))
-                    continue
-                deadline = asyncio.get_running_loop().time() + 15 * 60
-                while True:
-                    job = get_run(queued["run_id"])
-                    status = getattr(job, "status", None)
-                    if status == "completed":
-                        results = getattr(job, "results", None) or {}
-                        responses.append({"result": {"data": {"json": {"runId": queued["run_id"], **results}}}})
-                        break
-                    if status == "failed":
-                        raise RuntimeError(getattr(job, "error", None) or "Remote worker failed")
-                    if asyncio.get_running_loop().time() >= deadline:
-                        raise RuntimeError("The worker did not complete this mission within 15 minutes")
-                    await asyncio.sleep(1)
+                # Return the run ID immediately. The web client polls /v1/runs/{id}
+                # so long-running upstream execution remains visible and cancellable.
+                responses.append(_success(queued))
 
             if is_batch:
                 return JSONResponse(content=responses)

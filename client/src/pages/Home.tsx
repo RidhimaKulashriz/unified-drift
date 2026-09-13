@@ -66,6 +66,22 @@ async function uploadMedia(file: Blob, name: string) {
   return body.uri as string;
 }
 
+async function waitForWorker(runId: string, onProgress: (value: number, stage: Stage) => void) {
+  const apiBase = (import.meta.env.VITE_DRIFT_API_URL || "https://drift-orchestrator.onrender.com").replace(/\/$/, "");
+  const deadline = Date.now() + 15 * 60 * 1000;
+  while (Date.now() < deadline) {
+    const response = await fetch(`${apiBase}/v1/runs/${encodeURIComponent(runId)}`);
+    const job = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(job.detail || `Worker status failed (${response.status})`);
+    if (job.status === "completed") return { runId, ...job.results } as MissionResult;
+    if (job.status === "failed") throw new Error(job.error || "Worker failed this mission");
+    const progress = Math.max(22, Math.round((Number(job.progress) || 0) * 100));
+    onProgress(progress, progress >= 70 ? "processing" : "queued");
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+  throw new Error("The worker did not finish within 15 minutes");
+}
+
 const navItems: Array<{ id: Tab; icon: typeof Activity; text: string }> = [
   { id: "overview", icon: Activity, text: "Mission overview" },
   { id: "pipeline", icon: Waves, text: "Pipeline progress" },
@@ -115,7 +131,8 @@ export default function Home() {
         videoUri = await uploadMedia(selectedFile, selectedFile.name);
       }
       setStage("queued"); setProgress(22);
-      const output = await runMutation.mutateAsync({ videoUri, fileName: tdmMode ? "tdm-rgb-video.mp4" : selectedFile!.name, thermalVideoUri: tdmMode ? tdmInput.thermalVideoUri : thermalMode ? videoUri : undefined, ...tdmInput, enabledModules: modules.filter((module) => enabled[module.id]).map((module) => module.id) }) as MissionResult;
+      const queued = await runMutation.mutateAsync({ videoUri, fileName: tdmMode ? "tdm-rgb-video.mp4" : selectedFile!.name, thermalVideoUri: tdmMode ? tdmInput.thermalVideoUri : thermalMode ? videoUri : undefined, ...tdmInput, enabledModules: modules.filter((module) => enabled[module.id]).map((module) => module.id) }) as MissionResult;
+      const output = await waitForWorker(queued.runId, (value, nextStage) => { setProgress(value); setStage(nextStage); });
       setResult(output); setStage("complete"); setProgress(100); setActiveTab("evidence");
     } catch (cause) {
       setStage("error"); setError(cause instanceof Error ? cause.message : "The worker could not complete this mission.");
