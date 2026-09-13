@@ -348,9 +348,6 @@ def execute_all(args: argparse.Namespace, progress_callback=None) -> dict[str, A
         if progress_callback:
             progress_callback(len(results) + 1, entrypoint, record)
         return record
-    results.append(timed("mustatil", lambda: mustatil(args.output / "mustatil", args.image, args.geotiff)))
-    results.append(timed("arran", lambda: arran(args.output / "arran", args.arran_data)))
-    results.append(timed("simulated-training-data", lambda: simulated_training(args.output / "simulated-training", args.dem, args.streams, args.samples)))
     thermal_result = timed("aerial-thermal-detection", lambda: thermal(args.output / "thermal", args.thermal_video))
     results.append(thermal_result)
     results.append(timed("drone-tracker", lambda: drone_tracker(args.output / "drone-tracker", args.video)))
@@ -359,10 +356,13 @@ def execute_all(args: argparse.Namespace, progress_callback=None) -> dict[str, A
     results.append(timed("aerial-thermal-sar-detection-demo", lambda: thermal_sar_demo(args.output / "thermal-sar", args.thermal_video)))
     findings = thermal_result.get("findingRecords", []) if thermal_result.get("ran") else []
     results.append(timed("uav-thermal-person-geolocation", lambda: geolocation(args.output / "geolocation", args.srt, findings)))
-    results.append(timed("ros2-disaster-robot-sim", lambda: ros2(args.output / "ros2")))
+    results.append(timed("simulated-training-data", lambda: simulated_training(args.output / "simulated-training", args.dem, args.streams, args.samples)))
     results.append(timed("drone-control-monitoring-system", lambda: ground_station(args.output / "ground-station", args.telemetry)))
+    results.append(timed("mustatil", lambda: mustatil(args.output / "mustatil", args.image, args.geotiff)))
+    results.append(timed("arran", lambda: arran(args.output / "arran", args.arran_data)))
     results.append(timed("foundation-models-archaeology", lambda: foundation(args.output / "foundation-models", args.experiment, args.foundation_input)))
     results.append(timed("adaf", lambda: adaf(args.output / "adaf", args.geotiff)))
+    results.append(timed("ros2-disaster-robot-sim", lambda: ros2(args.output / "ros2")))
 
     inputs = {"video": str(args.video) if args.video else None, "thermalVideo": str(args.thermal_video) if args.thermal_video else None, "srt": str(args.srt) if args.srt else None, "rgbImage": str(args.rgb_image) if args.rgb_image else None, "image": str(args.image) if args.image else None, "geotiff": str(args.geotiff) if args.geotiff else None, "dem": str(args.dem) if args.dem else None, "streams": str(args.streams) if args.streams else None, "arranData": str(args.arran_data) if args.arran_data else None, "foundationInput": str(args.foundation_input) if args.foundation_input else None, "telemetry": str(args.telemetry) if args.telemetry else None}
     for record in results:
