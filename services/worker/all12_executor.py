@@ -46,17 +46,26 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _artifact_is_valid(artifact: Path | None) -> bool:
+    """Only accept a non-empty file or directory containing non-empty files."""
+    if artifact is None or not artifact.exists():
+        return False
+    if artifact.is_file():
+        return artifact.stat().st_size > 0
+    return any(path.is_file() and path.stat().st_size > 0 for path in artifact.rglob("*"))
+
+
 def ok(repo: str, mode: str, artifact: Path | None, detail: str, **extra: Any) -> dict[str, Any]:
+    if not _artifact_is_valid(artifact):
+        raise RuntimeError(f"{repo} completed without a verifiable output artifact: {artifact}")
     return {
         "repository": repo,
         "mode": mode,
         "status": "COMPLETED",
         "ran": True,
         "detail": detail,
-        "artifact": str(artifact) if artifact else None,
+        "artifact": str(artifact),
         "timestamp": now(),
-        # Non-detector repositories keep this empty; detector adapters fill it
-        # only with records returned by their upstream implementation.
         "findingRecords": extra.pop("findingRecords", []),
         **extra,
     }

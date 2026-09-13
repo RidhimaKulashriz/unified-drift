@@ -72,7 +72,15 @@ def download(uri: str | None, target: Path) -> Path | None:
         raise RuntimeError("OBJECT_STORAGE_ENDPOINT is not configured")
     bucket, key = _parse_uri(uri)
     target.parent.mkdir(parents=True, exist_ok=True)
-    s3_client.download_file(bucket, key, str(target))
+    # Backblaze credentials may allow GetObject while rejecting HeadObject;
+    # boto3.download_file performs HeadObject and causes the observed 403.
+    response = s3_client.get_object(Bucket=bucket, Key=key)
+    with target.open("wb") as handle:
+        while True:
+            chunk = response["Body"].read(1024 * 1024)
+            if not chunk:
+                break
+            handle.write(chunk)
     if not target.exists() or target.stat().st_size == 0:
         raise RuntimeError(f"downloaded empty object: {uri}")
     return target
@@ -168,6 +176,21 @@ def publish_normalized_artifact(normalized: dict[str, Any], output: Path, run_id
         s3_client.upload_file(str(path), OBJECT_STORAGE_BUCKET, key, ExtraArgs={"ContentType": "application/json"})
 
 
+def execution_gate(summary: dict[str, Any]) -> tuple[bool, str]:
+    """Require every upstream entrypoint to execute with a real artifact."""
+    records = summary.get("results", [])
+    expected = 12
+    if len(records) != expected:
+        return False, f"expected {expected} upstream records, received {len(records)}"
+    incomplete = []
+    for record in records:
+        if record.get("status") != "COMPLETED" or not record.get("ran") or not record.get("artifact"):
+            incomplete.append(f"{record.get('repository', 'unknown')}: {record.get('status', 'UNKNOWN')} — {record.get('detail', '')}")
+    if incomplete:
+        return False, "; ".join(incomplete)
+    return True, "all 12 upstream entrypoints produced verified artifacts"
+
+
 def normalize_summary(summary: dict[str, Any]) -> dict[str, Any]:
     """Expose the all-12 executor through the dashboard's stable mission contract."""
     records = summary.get("results", [])
@@ -224,9 +247,10 @@ def process_job(message: dict[str, Any]) -> bool:
         if thermal is None:
             thermal = download(message.get("thermal_video_uri"), work / "thermal.mp4")
         source_frame = work / "source-frame.jpg"
-        if video is not None:
+        frame_input = video or thermal
+        if frame_input is not None:
             frame_result = subprocess.run(
-                ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(video), "-frames:v", "1", str(source_frame)],
+                ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(frame_input), "-frames:v", "1", str(source_frame)],
                 capture_output=True, text=True, timeout=120,
             )
             if frame_result.returncode != 0 or not source_frame.is_file():
@@ -236,14 +260,18 @@ def process_job(message: dict[str, Any]) -> bool:
         als = download(message.get("als_uri"), work / "mission.laz")
         rgb = download(message.get("rgb_image_uri"), work / "rgb.jpg")
         image = download(message.get("image_uri"), work / "image.jpg")
-        telemetry = download(message.get("telemetry_uri"), work / "telemetry.bin")
+        # Keep the source formats expected by upstream code; do not rename JSON
+        # or GeoJSON fixtures to opaque .bin/.gpkg paths.
+        telemetry = download(message.get("telemetry_uri"), work / "telemetry.json")
         dem = download(message.get("dem_uri"), work / "dem.tif")
-        streams = download(message.get("streams_uri"), work / "streams.gpkg")
-        arran = download(message.get("arran_data_uri"), work / "arran-data")
-        foundation_input = download(message.get("foundation_input_uri"), work / "foundation-input")
+        streams = download(message.get("streams_uri"), work / "streams.geojson")
+        arran = download(message.get("arran_data_uri"), work / "arran-data.json")
+        foundation_input = download(message.get("foundation_input_uri"), work / "foundation-input.json")
 
-        if video is None:
-            raise RuntimeError("no video input supplied")
+        # A TDM mission may contain only geospatial, telemetry, benchmark, or
+        # simulator inputs. Do not force a video onto those upstream systems.
+        if all(value is None for value in (video, thermal, rgb, image, srt, telemetry, geotiff, als, dem, streams, arran, foundation_input)):
+            raise RuntimeError("no mission input supplied")
 
         update_job(run_id, "running", 0.15, "executing selected repository pipeline")
         active_run = redis_client.get(ACTIVE_RUN_KEY)
@@ -289,6 +317,10 @@ def process_job(message: dict[str, Any]) -> bool:
         publish_visual_artifacts(summary, run_id, source_frame)
         normalized = normalize_summary(summary)
         publish_normalized_artifact(normalized, output, run_id)
+        passed, gate_message = execution_gate(summary)
+        if not passed:
+            update_job(run_id, "failed", 1.0, "execution incomplete", normalized, error=gate_message)
+            return False
         update_job(run_id, "completed", 1.0, "completed", normalized)
         return True
     except Exception as exc:
