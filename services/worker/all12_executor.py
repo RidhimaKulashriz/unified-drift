@@ -340,7 +340,7 @@ def execute_all(args: argparse.Namespace, progress_callback=None) -> dict[str, A
         logger.info("PIPELINE_START entrypoint=%s", entrypoint)
         if progress_callback:
             progress_callback(len(results), entrypoint, {"status": "RUNNING"})
-        timeout_seconds = int(os.environ.get("DRIFT_ADAPTER_TIMEOUT_SECONDS", "120"))
+        timeout_seconds = int(os.environ.get("DRIFT_ADAPTER_TIMEOUT_SECONDS", "30"))
         def timeout_handler(_signum, _frame):
             raise TimeoutError(f"adapter exceeded {timeout_seconds}s timeout")
         try:
