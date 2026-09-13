@@ -86,23 +86,15 @@ def write_json(path: Path, payload: Any) -> Path:
 
 def mustatil(output: Path, image: Path | None, geotiff: Path | None) -> dict[str, Any]:
     repo = "mustatil"
-    pkg = importlib.util.find_spec("mustatil")
-    if pkg is None:
-        return fail(repo, "workspace/detection", "DEPENDENCY_REQUIRED", "Install the upstream Mustatil package: python -m pip install mustatil")
-    # Mustatil is a desktop GIS/AI workspace. Start its real CLI in headless-help
-    # mode for a deterministic smoke execution, then optionally run the supplied
-    # image through an Ultralytics-compatible model when a local model is given.
-    cli = run_process([sys.executable, "-m", "mustatil", "--help"], timeout=120)
-    if cli.returncode != 0:
-        return fail(repo, "workspace/detection", "FAILED", cli.stderr[-2000:] or cli.stdout[-2000:])
-    artifact = write_json(output / "mustatil_execution.json", {
-        "cliExitCode": cli.returncode,
-        "cliOutput": cli.stdout[-4000:],
-        "image": str(image) if image else None,
-        "geotiff": str(geotiff) if geotiff else None,
-        "repository": "https://github.com/tarekwasfy01/Mustatil-YOLO-AI-Model-Trainer-",
-    })
-    return ok(repo, "workspace/detection", artifact, "Upstream Mustatil CLI executed successfully", command="python -m mustatil --help")
+    if image is None:
+        return fail(repo, "workspace/detection", "INPUT_REQUIRED", "Provide an image or GeoTIFF for Mustatil inference")
+    try:
+        from mustatil_adapter import run_on_image
+        result = run_on_image(image, output)
+        artifact = Path(result["artifact"]) if result.get("artifact") else write_json(output / "mustatil_execution.json", result)
+        return ok(repo, "workspace/detection", artifact, "Real Mustatil/Ultralytics inference executed", findingRecords=result.get("findings", []), model=result.get("model"), input=str(image))
+    except Exception as exc:
+        return fail(repo, "workspace/detection", "FAILED", str(exc), input=str(image))
 
 
 def foundation(output: Path, experiment: str | None, input_data: Path | None) -> dict[str, Any]:
