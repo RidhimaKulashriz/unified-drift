@@ -110,6 +110,16 @@ def publish_visual_artifacts(summary: dict[str, Any], run_id: str) -> None:
         s3_client.upload_file(str(image), OBJECT_STORAGE_BUCKET, key, ExtraArgs={"ContentType": content_type})
         record["visualArtifactUri"] = f"s3://{OBJECT_STORAGE_BUCKET}/{key}"
 
+def publish_normalized_artifact(normalized: dict[str, Any], output: Path, run_id: str) -> None:
+    path = output / "normalized_drift.json"
+    normalized["normalizedArtifactPath"] = str(path)
+    path.write_text(json.dumps(normalized, indent=2, default=str), encoding="utf-8")
+    if s3_client:
+        key = f"results/{run_id}/normalized_drift.json"
+        normalized["normalizedArtifactUri"] = f"s3://{OBJECT_STORAGE_BUCKET}/{key}"
+        path.write_text(json.dumps(normalized, indent=2, default=str), encoding="utf-8")
+        s3_client.upload_file(str(path), OBJECT_STORAGE_BUCKET, key, ExtraArgs={"ContentType": "application/json"})
+
 
 def normalize_summary(summary: dict[str, Any]) -> dict[str, Any]:
     """Expose the all-12 executor through the dashboard's stable mission contract."""
@@ -182,6 +192,7 @@ def process_job(message: dict[str, Any]) -> bool:
             summary = {"runId": run_id, "createdAt": _now(), "totalRepositories": len(track["results"]), "results": track["results"], "mode": execution_mode}
             publish_visual_artifacts(summary, run_id)
             normalized = normalize_summary(summary)
+            publish_normalized_artifact(normalized, output, run_id)
             update_job(run_id, "completed", 1.0, "completed", normalized)
             return True
         class Args:
@@ -206,6 +217,7 @@ def process_job(message: dict[str, Any]) -> bool:
         summary["runId"] = run_id
         publish_visual_artifacts(summary, run_id)
         normalized = normalize_summary(summary)
+        publish_normalized_artifact(normalized, output, run_id)
         update_job(run_id, "completed", 1.0, "completed", normalized)
         return True
     except Exception as exc:

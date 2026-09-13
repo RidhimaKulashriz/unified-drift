@@ -27,6 +27,7 @@ MANUAL = {
 DIRECT_FILES = {
     "thermal-yolov12-checkpoint": "https://huggingface.co/Kiuyha/yolov12-human-detection-thermal-uav/resolve/main/best.pt",
     "dronekit-flight-tlog": "https://raw.githubusercontent.com/dronekit/dronekit-la-testdata/master/flight.tlog",
+    "rgbt-onnx": "https://huggingface.co/hiuS04/RGBT-Fusion-Drone-SAR/resolve/main/fusion_progressive_finetune.onnx",
 }
 
 
