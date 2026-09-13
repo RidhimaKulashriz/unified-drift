@@ -82,6 +82,41 @@ def write_inline(encoded: str | None, target: Path, label: str) -> Path | None:
     return target
 
 
+def normalize_summary(summary: dict[str, Any]) -> dict[str, Any]:
+    """Expose the all-12 executor through the dashboard's stable mission contract."""
+    records = summary.get("results", [])
+    adapters = []
+    findings: list[dict[str, Any]] = []
+    for record in records:
+        repo = record.get("repository", "unknown")
+        status = record.get("status", "UNKNOWN")
+        adapters.append({
+            "adapterId": repo,
+            "repository": repo,
+            "model": record.get("mode", "upstream adapter"),
+            "executionStatus": status,
+            "reason": record.get("detail", ""),
+            "contribution": record.get("detail", ""),
+            "ran": bool(record.get("ran")),
+            "artifact": record.get("artifact"),
+        })
+        for finding in record.get("findingRecords", []) or []:
+            findings.append(finding)
+    return {
+        "runId": summary.get("runId"),
+        "createdAt": summary.get("createdAt"),
+        "adapters": adapters,
+        "findings": findings,
+        "executions": records,
+        "fusion": {
+            "method": "provenance-preserving all-12 execution ledger",
+            "inputFindingCount": len(findings),
+            "outputFindingCount": len(findings),
+        },
+        "summary": summary,
+    }
+
+
 def process_job(message: dict[str, Any]) -> bool:
     run_id = str(message["run_id"])
     work = Path(tempfile.mkdtemp(prefix=f"drift-{run_id}-"))
@@ -129,7 +164,9 @@ def process_job(message: dict[str, Any]) -> bool:
         args.experiment = message.get("experiment")
         args.samples = int(message.get("samples", 3))
         summary = execute_all(args)
-        update_job(run_id, "completed", 1.0, "completed", summary)
+        summary["runId"] = run_id
+        normalized = normalize_summary(summary)
+        update_job(run_id, "completed", 1.0, "completed", normalized)
         return True
     except Exception as exc:
         logger.exception("job %s failed", run_id)

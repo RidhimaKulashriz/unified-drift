@@ -208,7 +208,7 @@ def drone_tracker(output: Path, video: Path | None) -> dict[str, Any]:
         result = run_on_video(video, output)
         artifact = Path(result.get("artifact")) if result.get("artifact") else None
         if artifact and artifact.exists():
-            return ok("drone-tracker", "tracking", artifact, "Upstream detector/tracker executed", statistics=result.get("statistics"))
+            return ok("drone-tracker", "tracking", artifact, "Upstream detector/tracker executed", statistics=result.get("statistics"), findingRecords=result.get("findings", []))
         return fail("drone-tracker", "tracking", "FAILED", "Adapter returned without a verifiable output artifact")
     except Exception as exc:
         return fail("drone-tracker", "tracking", "FAILED", str(exc))
@@ -225,7 +225,7 @@ def thermal(output: Path, video: Path | None) -> dict[str, Any]:
             return fail("aerial-thermal-detection", "thermal-detection", "FAILED", r.stderr[-2000:] or "frame extraction failed")
         result = run_on_image(frame, output)
         findings = result.get("findings", [])
-        return ok("aerial-thermal-detection", "thermal-detection", Path(result.get("artifact")) if result.get("artifact") else frame, "Real RT-DETR/YOLO thermal inference executed", findings=len(findings))
+        return ok("aerial-thermal-detection", "thermal-detection", Path(result.get("artifact")) if result.get("artifact") else frame, "Real RT-DETR/YOLO thermal inference executed", findings=len(findings), findingRecords=findings)
     except Exception as exc:
         return fail("aerial-thermal-detection", "thermal-detection", "FAILED", str(exc))
 
@@ -242,7 +242,7 @@ def thermal_sar_demo(output: Path, video: Path | None) -> dict[str, Any]:
         result = run_on_image(frame, output)
         artifacts = result.get("artifacts") or []
         artifact = Path(artifacts[0]) if artifacts and Path(artifacts[0]).exists() else frame
-        return ok("aerial-thermal-sar-detection-demo", "thermal-sar", artifact, "Upstream YOLOv12 + RT-DETRv2 inference executed", findings=len(result.get("findings", [])))
+        return ok("aerial-thermal-sar-detection-demo", "thermal-sar", artifact, "Upstream YOLOv12 + RT-DETRv2 inference executed", findings=len(result.get("findings", [])), findingRecords=result.get("findings", []))
     except Exception as exc:
         return fail("aerial-thermal-sar-detection-demo", "thermal-sar", "FAILED", str(exc))
 
@@ -343,6 +343,7 @@ def execute_all(args: argparse.Namespace) -> dict[str, Any]:
     results.append(ground_station(args.output / "ground-station", args.telemetry))
 
     summary = {
+        "runId": os.environ.get("DRIFT_RUN_ID"),
         "createdAt": now(),
         "totalRepositories": len(REPOS),
         "completed": sum(r["status"] == "COMPLETED" for r in results),
