@@ -131,7 +131,7 @@ def foundation(output: Path, experiment: str | None, input_data: Path | None) ->
     env = os.environ.copy()
     if input_data:
         env["DRIFT_INPUT_DATA"] = str(input_data)
-    timeout = int(os.environ.get("DRIFT_PIPELINE_TIMEOUT_SECONDS", "300"))
+    timeout = int(os.environ.get("DRIFT_PIPELINE_TIMEOUT_SECONDS", "90"))
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env, cwd=str(ROOT))
     if result.returncode != 0 or not executed.exists():
         return fail(repo, "notebook", "FAILED", result.stderr[-4000:] or result.stdout[-4000:], notebook=str(selected))
@@ -145,7 +145,7 @@ def adaf(output: Path, geotiff: Path | None) -> dict[str, Any]:
     notebook = VENDOR / repo / "ADAF_main.ipynb"
     if notebook.exists():
         try:
-            r = run_process(["jupyter", "nbconvert", "--to", "notebook", "--execute", str(notebook), "--output", str(output / "ADAF_main_executed.ipynb")], timeout=int(os.environ.get("DRIFT_PIPELINE_TIMEOUT_SECONDS", "300")), cwd=ROOT)
+            r = run_process(["jupyter", "nbconvert", "--to", "notebook", "--execute", str(notebook), "--output", str(output / "ADAF_main_executed.ipynb")], timeout=int(os.environ.get("DRIFT_PIPELINE_TIMEOUT_SECONDS", "90")), cwd=ROOT)
             artifact = output / "ADAF_main_executed.ipynb"
             if r.returncode == 0 and artifact.exists():
                 return ok(repo, "als-lidar", artifact, "Upstream ADAF notebook executed", input=str(geotiff))
@@ -343,8 +343,6 @@ def execute_all(args: argparse.Namespace) -> dict[str, Any]:
         record.setdefault("exitCode", 0 if record.get("status") == "COMPLETED" else None)
         return record
     results.append(timed("mustatil", lambda: mustatil(args.output / "mustatil", args.image, args.geotiff)))
-    results.append(timed("foundation-models-archaeology", lambda: foundation(args.output / "foundation-models", args.experiment, args.foundation_input)))
-    results.append(timed("adaf", lambda: adaf(args.output / "adaf", args.geotiff)))
     results.append(timed("arran", lambda: arran(args.output / "arran", args.arran_data)))
     results.append(timed("simulated-training-data", lambda: simulated_training(args.output / "simulated-training", args.dem, args.streams, args.samples)))
     thermal_result = timed("aerial-thermal-detection", lambda: thermal(args.output / "thermal", args.thermal_video))
@@ -357,6 +355,8 @@ def execute_all(args: argparse.Namespace) -> dict[str, Any]:
     results.append(timed("uav-thermal-person-geolocation", lambda: geolocation(args.output / "geolocation", args.srt, findings)))
     results.append(timed("ros2-disaster-robot-sim", lambda: ros2(args.output / "ros2")))
     results.append(timed("drone-control-monitoring-system", lambda: ground_station(args.output / "ground-station", args.telemetry)))
+    results.append(timed("foundation-models-archaeology", lambda: foundation(args.output / "foundation-models", args.experiment, args.foundation_input)))
+    results.append(timed("adaf", lambda: adaf(args.output / "adaf", args.geotiff)))
 
     inputs = {"video": str(args.video) if args.video else None, "thermalVideo": str(args.thermal_video) if args.thermal_video else None, "srt": str(args.srt) if args.srt else None, "rgbImage": str(args.rgb_image) if args.rgb_image else None, "image": str(args.image) if args.image else None, "geotiff": str(args.geotiff) if args.geotiff else None, "dem": str(args.dem) if args.dem else None, "streams": str(args.streams) if args.streams else None, "arranData": str(args.arran_data) if args.arran_data else None, "foundationInput": str(args.foundation_input) if args.foundation_input else None, "telemetry": str(args.telemetry) if args.telemetry else None}
     for record in results:
