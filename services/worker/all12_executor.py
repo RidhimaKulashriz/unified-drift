@@ -342,29 +342,18 @@ def geolocation(output: Path, srt: Path | None, findings: list[dict[str, Any]]) 
 
 def ros2(output: Path) -> dict[str, Any]:
     repo = "ros2-disaster-robot-sim"
-    root = VENDOR / repo
     try:
-        # ROS 2 CLI has no portable `ros2 --version` command. Listing package
-        # metadata is a valid, lightweight Humble environment smoke check.
-        version = run_process(["ros2", "pkg", "list"], timeout=60)
-    except FileNotFoundError:
-        return fail(repo, "ros2-simulation", "RUNTIME_REQUIRED", "Install ROS2 Humble on the Linux worker")
-    if version.returncode != 0:
-        return fail(repo, "ros2-simulation", "RUNTIME_REQUIRED", version.stderr[-2000:] or "ROS2 package environment is unavailable")
-    launches = list(root.rglob("*.launch.py"))
-    if not launches:
-        return fail(repo, "ros2-simulation", "UPSTREAM_ENTRYPOINT_MISSING", "No ROS2 launch file found")
-    launch = launches[0]
-    result = run_process(["ros2", "launch", str(launch)], cwd=root, timeout=120)
-    log = write_json(output / "ros2_execution.json", {
-        "launch": str(launch.relative_to(root)),
-        "returncode": result.returncode,
-        "stdout": result.stdout[-6000:],
-        "stderr": result.stderr[-6000:],
-    })
-    if result.returncode != 0:
-        return fail(repo, "ros2-simulation", "FAILED", result.stderr[-3000:] or result.stdout[-3000:], artifact=str(log))
-    return ok(repo, "ros2-simulation", log, "Upstream ROS2 launch executed")
+        from ros2_simulator_adapter import execute_ros2_simulation
+        result = execute_ros2_simulation(output, duration=120)
+        artifact = Path(result.get("artifact")) if result.get("artifact") else output
+        result.pop("artifact", None)
+        return ok(repo, "ros2-simulation", artifact, "Upstream ROS2 workspace built and launch executed", **result)
+    except FileNotFoundError as exc:
+        return fail(repo, "ros2-simulation", "UPSTREAM_ENTRYPOINT_MISSING", str(exc))
+    except RuntimeError as exc:
+        message = str(exc)
+        status = "RUNTIME_REQUIRED" if "ROS2" in message or "colcon" in message else "FAILED"
+        return fail(repo, "ros2-simulation", status, message)
 
 
 def ground_station(output: Path, telemetry: Path | None) -> dict[str, Any]:
