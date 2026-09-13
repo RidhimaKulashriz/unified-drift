@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import json
+import mimetypes
 import os
 import uuid
 from datetime import datetime, timezone
@@ -22,6 +25,7 @@ OBJECT_STORAGE_ACCESS_KEY = os.environ.get("OBJECT_STORAGE_ACCESS_KEY")
 OBJECT_STORAGE_SECRET_KEY = os.environ.get("OBJECT_STORAGE_SECRET_KEY")
 OBJECT_STORAGE_BUCKET = os.environ.get("OBJECT_STORAGE_BUCKET", "drift-storage")
 WORKER_QUEUE_NAME = os.environ.get("WORKER_QUEUE_NAME", "drift-inference")
+MAX_INLINE_BYTES = int(os.environ.get("MAX_INLINE_BYTES", str(256 * 1024 * 1024)))
 
 app = FastAPI(title="DRIFT Orchestrator", version="1.0")
 app.add_middleware(
@@ -91,6 +95,52 @@ def health() -> dict[str, Any]:
             storage_ok = False
     return {"status": "healthy" if redis_ok else "degraded", "redis": redis_ok, "objectStorage": storage_ok, "storageMode": storage_mode}
 
+
+def _decode_inline(value: str, label: str) -> bytes:
+    encoded = value.split(",", 1)[1] if value.startswith("data:") and "," in value else value
+    try:
+        decoded = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid inline {label} payload") from exc
+    if not decoded:
+        raise HTTPException(status_code=400, detail=f"Inline {label} payload is empty")
+    if len(decoded) > MAX_INLINE_BYTES:
+        raise HTTPException(status_code=413, detail=f"Inline {label} exceeds the {MAX_INLINE_BYTES // (1024 * 1024)} MB limit")
+    return decoded
+
+
+def _externalize_inline(payload: dict[str, Any], run_id: str, field: str, filename_field: str, uri_field: str) -> None:
+    encoded = payload.get(field)
+    if not encoded:
+        return
+    if not s3_client:
+        raise HTTPException(status_code=503, detail="Object storage is required for inline video uploads")
+    raw = _decode_inline(encoded, field)
+    filename = os.path.basename(str(payload.get(filename_field) or f"{field}.bin"))
+    key = f"missions/{run_id}/{filename}"
+    content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    try:
+        s3_client.put_object(Bucket=OBJECT_STORAGE_BUCKET, Key=key, Body=raw, ContentType=content_type)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Object storage upload failed: {exc}") from exc
+    payload[uri_field] = f"s3://{OBJECT_STORAGE_BUCKET}/{key}"
+    payload.pop(field, None)
+
+
+def _clear_oversized_redis_state() -> None:
+    """Best-effort recovery for the free Valkey noeviction limit."""
+    try:
+        redis_client.delete(WORKER_QUEUE_NAME)
+        cursor = 0
+        while True:
+            cursor, keys = redis_client.scan(cursor=cursor, match="job:*")
+            if keys:
+                redis_client.delete(*keys)
+            if cursor == 0:
+                break
+    except Exception:
+        pass
+
 @app.post("/v1/runs")
 def submit_run(mission: MissionSubmission) -> dict[str, str]:
     has_input = any(value is not None for key, value in mission.model_dump().items() if key.endswith("_uri") or key.endswith("_base64"))
@@ -99,13 +149,20 @@ def submit_run(mission: MissionSubmission) -> dict[str, str]:
     run_id = f"DRF-{datetime.now(timezone.utc).strftime('%y%m%d')}-{uuid.uuid4().hex[:8]}"
     now = datetime.now(timezone.utc).isoformat()
     payload = mission.model_dump()
+    _externalize_inline(payload, run_id, "video_base64", "video_file_name", "video_uri")
+    _externalize_inline(payload, run_id, "thermal_video_base64", "thermal_video_file_name", "thermal_video_uri")
     record_input = dict(payload)
-    for key in ("video_base64", "thermal_video_base64"):
-        if record_input.get(key):
-            record_input[key] = f"<inline:{len(record_input[key])} chars>"
     record = {"run_id": run_id, "status": "queued", "created_at": now, "updated_at": now, "progress": 0.0, "current_stage": "queued", "input": record_input, "results": None, "error": None}
-    redis_client.set(f"job:{run_id}", json.dumps(record))
-    redis_client.rpush(WORKER_QUEUE_NAME, json.dumps({"run_id": run_id, **payload}))
+    queue_payload = {"run_id": run_id, **payload}
+    try:
+        redis_client.set(f"job:{run_id}", json.dumps(record), ex=86400)
+        redis_client.rpush(WORKER_QUEUE_NAME, json.dumps(queue_payload))
+    except redis.exceptions.ResponseError as exc:
+        if "maxmemory" not in str(exc).lower():
+            raise
+        _clear_oversized_redis_state()
+        redis_client.set(f"job:{run_id}", json.dumps(record), ex=86400)
+        redis_client.rpush(WORKER_QUEUE_NAME, json.dumps(queue_payload))
     return {"run_id": run_id, "status": "queued"}
 
 @app.get("/v1/runs/{run_id}")
