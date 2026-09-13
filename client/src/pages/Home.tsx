@@ -22,7 +22,6 @@ import {
   Waves,
   X,
 } from "lucide-react";
-import { trpc } from "@/lib/trpc";
 
 const modules = [
   { id: "mustatil", label: "GIS AI workspace", repo: "Mustatil", icon: ScanSearch, detail: "images / GeoTIFF / satellite" },
@@ -82,6 +81,20 @@ async function waitForWorker(runId: string, onProgress: (value: number, stage: S
   throw new Error("The worker did not finish within 15 minutes");
 }
 
+async function queueMission(input: Record<string, unknown>) {
+  const apiBase = (import.meta.env.VITE_DRIFT_API_URL || "https://drift-orchestrator.onrender.com").replace(/\/$/, "");
+  const response = await fetch(`${apiBase}/api/trpc/mission.run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ json: input }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error?.json?.message || payload?.detail || `Mission queue failed (${response.status})`);
+  const queued = payload?.result?.data?.json;
+  if (!queued?.runId) throw new Error("Mission queue returned no run ID");
+  return queued as { runId: string };
+}
+
 const navItems: Array<{ id: Tab; icon: typeof Activity; text: string }> = [
   { id: "overview", icon: Activity, text: "Mission overview" },
   { id: "pipeline", icon: Waves, text: "Pipeline progress" },
@@ -102,7 +115,6 @@ export default function Home() {
   const [result, setResult] = useState<MissionResult | null>(null);
   const [error, setError] = useState("");
   const activeCount = useMemo(() => Object.values(enabled).filter(Boolean).length, [enabled]);
-  const runMutation = trpc.mission.run.useMutation();
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
@@ -131,7 +143,7 @@ export default function Home() {
         videoUri = await uploadMedia(selectedFile, selectedFile.name);
       }
       setStage("queued"); setProgress(22);
-      const queued = await runMutation.mutateAsync({ videoUri, fileName: tdmMode ? "tdm-rgb-video.mp4" : selectedFile!.name, thermalVideoUri: tdmMode ? tdmInput.thermalVideoUri : thermalMode ? videoUri : undefined, ...tdmInput, enabledModules: modules.filter((module) => enabled[module.id]).map((module) => module.id) }) as MissionResult;
+      const queued = await queueMission({ videoUri, fileName: tdmMode ? "tdm-rgb-video.mp4" : selectedFile!.name, thermalVideoUri: tdmMode ? tdmInput.thermalVideoUri : thermalMode ? videoUri : undefined, ...tdmInput, enabledModules: modules.filter((module) => enabled[module.id]).map((module) => module.id) });
       const output = await waitForWorker(queued.runId, (value, nextStage) => { setProgress(value); setStage(nextStage); });
       setResult(output); setStage("complete"); setProgress(100); setActiveTab("evidence");
     } catch (cause) {
