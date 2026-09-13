@@ -51,3 +51,20 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
 .adapter-link small { margin-top:3px; color:#686863; font:8px 'DM Mono', monospace; }
 .adapter-link b { color:#d8f59c; font:10px 'DM Mono', monospace; font-weight:400; }
 .annotated-frame { position:absolute; inset:0; z-index:3; object-fit:contain; background:#111; }
+.visual-gallery { margin-top:24px; border:1px solid #292929; background:#101010; padding:17px; }
+.gallery-heading { display:flex; justify-content:space-between; align-items:flex-end; gap:15px; padding-bottom:13px; border-bottom:1px solid #292929; }
+.gallery-heading h3 { margin:7px 0 0; font-size:14px; font-weight:600; }
+.gallery-heading > span { color:#d8f59c; font:9px 'DM Mono', monospace; }
+.gallery-grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:9px; margin-top:12px; }
+.visual-card { min-width:0; padding:0; text-align:left; color:#e7e7e1; background:#171716; border:1px solid #292929; cursor:pointer; overflow:hidden; }
+.visual-card:hover,.visual-card.active { border-color:#d8f59c; }
+.visual-card img { width:100%; aspect-ratio:16/10; object-fit:cover; display:block; background:#0b0b0b; }
+.visual-empty { aspect-ratio:16/10; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:5px; padding:8px; color:#777; text-align:center; }
+.visual-empty span { font-size:10px; }
+.visual-empty small { color:#565651; font:8px 'DM Mono', monospace; max-height:30px; overflow:hidden; }
+.visual-card-meta { padding:9px; border-top:1px solid #292929; }
+.visual-card-meta strong,.visual-card-meta small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.visual-card-meta strong { font-size:10px; font-weight:600; }
+.visual-card-meta small { margin-top:4px; color:#777; font:8px 'DM Mono', monospace; }
+@media (max-width: 950px) { .gallery-grid { grid-template-columns:repeat(3, minmax(0,1fr)); } }
+@media (max-width: 540px) { .gallery-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } .gallery-heading { align-items:flex-start; flex-direction:column; } }
