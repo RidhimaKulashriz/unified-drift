@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: drift-orchestrator
+    runtime: docker
+    rootDir: services/orchestrator
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: REDIS_URL
+        sync: false
+      - key: OBJECT_STORAGE_ENDPOINT
+        sync: false
+      - key: OBJECT_STORAGE_ACCESS_KEY
+        sync: false
+      - key: OBJECT_STORAGE_SECRET_KEY
+        sync: false
+      - key: OBJECT_STORAGE_BUCKET
+        sync: false
+      - key: WORKER_QUEUE_NAME
+        value: drift-inference
+
+  - type: worker
+    name: drift-inference-worker
+    runtime: docker
+    rootDir: services/worker
+    plan: starter
+    envVars:
+      - key: REDIS_URL
+        sync: false
+      - key: OBJECT_STORAGE_ENDPOINT
+        sync: false
+      - key: OBJECT_STORAGE_ACCESS_KEY
+        sync: false
+      - key: OBJECT_STORAGE_SECRET_KEY
+        sync: false
+      - key: OBJECT_STORAGE_BUCKET
+        sync: false
+      - key: MODEL_CACHE_DIR
+        value: /models
