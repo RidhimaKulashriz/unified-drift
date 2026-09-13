@@ -22,3 +22,21 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
   .module-card { min-width: 0; overflow: hidden; }
   .run-meter { flex: 1 1 auto; width: 100%; }
 }
+
+/* mission progress rail */
+.progress-sidebar { margin-top: 34px; border-top: 1px solid #292929; padding-top: 16px; }
+.progress-title { display:flex; justify-content:space-between; color:#6d6d69; font:10px 'DM Mono', monospace; letter-spacing:.08em; }
+.progress-title strong { color:#d8f59c; font-weight:400; }
+.progress-track { height:3px; background:#292929; margin:10px 0 14px; }
+.progress-track div { height:100%; background:#d8f59c; transition:width 260ms ease-out; }
+.progress-sidebar ol { list-style:none; padding:0; margin:0; display:grid; gap:10px; }
+.progress-sidebar li { display:flex; align-items:center; gap:8px; color:#5e5e5a; font:9px 'DM Mono', monospace; }
+.progress-sidebar li span { width:16px; height:16px; border:1px solid #3c3c39; display:grid; place-items:center; color:#666; }
+.progress-sidebar li.done { color:#a6a69f; }
+.progress-sidebar li.done span { border-color:#788a53; color:#d8f59c; }
+.outline-button.active { border-color:#788a53; color:#d8f59c; background:#171b12; }
+.signal-item b.good { color:#d8f59c; }
+.signal-item b.muted { color:#777; }
+.error-banner { margin-top:11px; border:1px solid #704746; background:#1b1111; color:#e0aaa5; padding:12px 14px; display:flex; gap:9px; align-items:flex-start; font:10px/1.5 'DM Mono', monospace; }
+.pulse.error { background:#dc7770; box-shadow:0 0 0 5px rgba(220,119,112,.09); }
+@media (max-width: 950px) { .progress-sidebar { display:none; } }
