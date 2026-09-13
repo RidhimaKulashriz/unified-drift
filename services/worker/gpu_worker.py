@@ -222,7 +222,13 @@ def process_job(message: dict[str, Any]) -> bool:
         args.foundation_input = foundation_input
         args.experiment = message.get("experiment")
         args.samples = int(message.get("samples", 3))
-        summary = execute_all(args)
+        def pipeline_progress(completed: int, entrypoint: str, record: dict[str, Any]) -> None:
+            if redis_client.get(ACTIVE_RUN_KEY) not in (None, run_id):
+                raise RuntimeError("Superseded by a newer user submission")
+            progress = min(0.95, 0.15 + (completed / 12.0) * 0.80)
+            update_job(run_id, "running", progress, f"completed {completed}/12: {entrypoint}")
+
+        summary = execute_all(args, progress_callback=pipeline_progress)
         summary["runId"] = run_id
         publish_visual_artifacts(summary, run_id)
         normalized = normalize_summary(summary)

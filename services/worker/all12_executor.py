@@ -331,7 +331,7 @@ def ground_station(output: Path, telemetry: Path | None) -> dict[str, Any]:
         return fail(repo, "telemetry", "FAILED", str(exc))
 
 
-def execute_all(args: argparse.Namespace) -> dict[str, Any]:
+def execute_all(args: argparse.Namespace, progress_callback=None) -> dict[str, Any]:
     args.output.mkdir(parents=True, exist_ok=True)
     results: list[dict[str, Any]] = []
     def timed(entrypoint: str, fn):
@@ -345,6 +345,8 @@ def execute_all(args: argparse.Namespace) -> dict[str, Any]:
         record["durationSeconds"] = round(time.monotonic() - started, 3)
         record.setdefault("exitCode", 0 if record.get("status") == "COMPLETED" else None)
         logger.info("PIPELINE_END entrypoint=%s status=%s duration=%.3fs artifact=%s reason=%s", entrypoint, record.get("status"), record["durationSeconds"], record.get("artifact"), record.get("reason") or record.get("detail") or "")
+        if progress_callback:
+            progress_callback(len(results) + 1, entrypoint, record)
         return record
     results.append(timed("mustatil", lambda: mustatil(args.output / "mustatil", args.image, args.geotiff)))
     results.append(timed("arran", lambda: arran(args.output / "arran", args.arran_data)))
