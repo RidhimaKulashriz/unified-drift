@@ -3,6 +3,9 @@
 
 Lightweight API only: accepts a mission manifest, queues it in Redis, and lets
 the remote worker perform all heavy repository execution.
+
+Object storage is optional. A Redis-only deployment can queue and track runs
+without requiring an S3-compatible service or payment details.
 """
 from __future__ import annotations
 
@@ -76,6 +79,8 @@ def health() -> dict[str, Any]:
         redis_ok = bool(redis_client.ping())
     except Exception:
         redis_ok = False
+
+    storage_mode = "s3" if s3_client else "disabled"
     storage_ok = False
     if s3_client:
         try:
@@ -83,7 +88,13 @@ def health() -> dict[str, Any]:
             storage_ok = True
         except Exception:
             storage_ok = False
-    return {"status": "healthy" if redis_ok else "degraded", "redis": redis_ok, "objectStorage": storage_ok}
+
+    return {
+        "status": "healthy" if redis_ok else "degraded",
+        "redis": redis_ok,
+        "objectStorage": storage_ok,
+        "storageMode": storage_mode,
+    }
 
 
 @app.post("/v1/runs")
@@ -131,7 +142,7 @@ async def events(run_id: str):
 @app.post("/v1/storage/upload")
 def upload_to_storage(file_key: str, file_path: str) -> dict[str, str]:
     if not s3_client:
-        raise HTTPException(status_code=503, detail="Object storage is not configured")
+        raise HTTPException(status_code=503, detail="Object storage is disabled in this deployment")
     s3_client.upload_file(file_path, OBJECT_STORAGE_BUCKET, file_key)
     return {"status": "uploaded", "uri": f"s3://{OBJECT_STORAGE_BUCKET}/{file_key}"}
 
@@ -139,7 +150,7 @@ def upload_to_storage(file_key: str, file_path: str) -> dict[str, str]:
 @app.get("/v1/storage/objects/{file_key:path}")
 def download_from_storage(file_key: str):
     if not s3_client:
-        raise HTTPException(status_code=503, detail="Object storage is not configured")
+        raise HTTPException(status_code=503, detail="Object storage is disabled in this deployment")
     try:
         obj = s3_client.get_object(Bucket=OBJECT_STORAGE_BUCKET, Key=file_key)
     except Exception as exc:
