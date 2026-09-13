@@ -1,0 +1,4 @@
+1
+00:00:00,000 --> 00:00:00,750
+[latitude: 24.7136] [longitude: 46.6753] [rel_alt: 40.0 abs_alt: 640.0] [gb_yaw: 0.0 gb_pitch: -90.0 gb_roll: 0.0]
+

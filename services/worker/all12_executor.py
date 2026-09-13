@@ -218,6 +218,7 @@ def thermal(output: Path, video: Path | None) -> dict[str, Any]:
     if video is None:
         return fail("aerial-thermal-detection", "thermal-detection", "INPUT_REQUIRED", "Provide thermal video")
     try:
+        output.mkdir(parents=True, exist_ok=True)
         from aerial_thermal_adapter import run_on_image
         frame = output / "thermal_frame.jpg"
         r = run_process(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(video), "-frames:v", "1", str(frame)], timeout=120)
@@ -234,6 +235,7 @@ def thermal_sar_demo(output: Path, video: Path | None) -> dict[str, Any]:
     if video is None:
         return fail("aerial-thermal-sar-detection-demo", "thermal-sar", "INPUT_REQUIRED", "Provide thermal video")
     try:
+        output.mkdir(parents=True, exist_ok=True)
         from aerial_thermal_sar_demo_adapter import run_on_image
         frame = output / "sar_frame.jpg"
         r = run_process(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(video), "-frames:v", "1", str(frame)], timeout=120)
