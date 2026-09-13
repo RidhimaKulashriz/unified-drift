@@ -84,7 +84,7 @@ async function waitForWorker(runId: string, onProgress: (value: number, stage: S
     if (!response.ok) throw new Error(job.detail || `Worker status failed (${response.status})`);
     if (job.status === "completed") return { runId, ...job.results } as MissionResult;
     if (job.status === "failed") throw new Error(job.error || "Worker failed this mission");
-    const progress = Math.max(22, Math.round((Number(job.progress) || 0) * 100));
+    const progress = Math.max(0, Math.min(100, Math.round((Number(job.progress) || 0) * 100)));
     onProgress(progress, progress >= 70 ? "processing" : "queued");
     await new Promise((resolve) => setTimeout(resolve, 1500));
   }
@@ -171,7 +171,7 @@ export default function Home() {
       const output = await waitForWorker(queued.runId, (value, nextStage) => { setProgress(value); setStage(nextStage); });
       setResult(output); setSelectedAdapterId(output.adapters[0]?.adapterId ?? null); setStage("complete"); setProgress(100); setActiveTab("evidence");
     } catch (cause) {
-      setStage("error"); setError(cause instanceof Error ? cause.message : "The worker could not complete this mission.");
+      setStage("error"); setProgress(0); setError(cause instanceof Error ? cause.message : "The worker could not complete this mission.");
     } finally { setRunning(false); }
   };
 
