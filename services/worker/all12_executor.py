@@ -104,6 +104,8 @@ def mustatil(output: Path, image: Path | None, geotiff: Path | None) -> dict[str
 
 def foundation(output: Path, experiment: str | None, input_data: Path | None) -> dict[str, Any]:
     repo = "foundation-models-archaeology"
+    if input_data is None:
+        return fail(repo, "notebook", "INPUT_REQUIRED", "Provide satellite, LiDAR, GeoTIFF, or foundation input data")
     root = VENDOR / repo
     notebooks = []
     for p in root.glob("Experiment_*/*.ipynb"):
