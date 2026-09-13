@@ -7,13 +7,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TDM_CACHE_DIR=/var/lib/drift/tdm-cache
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg git curl ca-certificates build-essential libglib2.0-0 libgl1 \
+    ffmpeg git curl ca-certificates build-essential python3-pip python3-dev \
+    libglib2.0-0 libgl1 \
     ros-humble-gazebo-ros-pkgs ros-humble-xacro \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/services/worker
 COPY requirements-gpu.txt ./requirements-gpu.txt
-RUN pip install --upgrade pip && pip install -r requirements-gpu.txt \
+RUN python3 -m pip install --upgrade pip && python3 -m pip install -r requirements-gpu.txt \
     jupyter nbconvert rasterio geopandas shapely pyproj
 
 COPY . .
