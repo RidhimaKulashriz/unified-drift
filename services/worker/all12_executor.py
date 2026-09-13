@@ -13,6 +13,7 @@ import importlib.util
 import json
 import os
 import subprocess
+import signal
 import sys
 import tempfile
 import time
@@ -337,8 +338,19 @@ def execute_all(args: argparse.Namespace, progress_callback=None) -> dict[str, A
     def timed(entrypoint: str, fn):
         started = time.monotonic()
         logger.info("PIPELINE_START entrypoint=%s", entrypoint)
+        if progress_callback:
+            progress_callback(len(results), entrypoint, {"status": "RUNNING"})
+        timeout_seconds = int(os.environ.get("DRIFT_ADAPTER_TIMEOUT_SECONDS", "120"))
+        def timeout_handler(_signum, _frame):
+            raise TimeoutError(f"adapter exceeded {timeout_seconds}s timeout")
         try:
-            record = fn()
+            previous_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
+            try:
+                record = fn()
+            finally:
+                signal.setitimer(signal.ITIMER_REAL, 0)
+                signal.signal(signal.SIGALRM, previous_handler)
         except Exception as exc:
             record = fail(entrypoint, "execution", "FAILED", str(exc))
         record["entrypoint"] = entrypoint

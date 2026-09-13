@@ -226,7 +226,8 @@ def process_job(message: dict[str, Any]) -> bool:
             if redis_client.get(ACTIVE_RUN_KEY) not in (None, run_id):
                 raise RuntimeError("Superseded by a newer user submission")
             progress = min(0.95, 0.15 + (completed / 12.0) * 0.80)
-            update_job(run_id, "running", progress, f"completed {completed}/12: {entrypoint}")
+            stage = f"running {entrypoint} ({completed}/12 complete)" if record.get("status") == "RUNNING" else f"completed {completed}/12: {entrypoint}"
+            update_job(run_id, "running", progress, stage)
 
         summary = execute_all(args, progress_callback=pipeline_progress)
         summary["runId"] = run_id
