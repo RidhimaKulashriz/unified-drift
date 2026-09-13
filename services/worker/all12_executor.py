@@ -270,14 +270,11 @@ def thermal(output: Path, video: Path | None) -> dict[str, Any]:
         return fail("aerial-thermal-detection", "thermal-detection", "INPUT_REQUIRED", "Provide thermal video")
     try:
         output.mkdir(parents=True, exist_ok=True)
-        from aerial_thermal_adapter import run_on_image
-        frame = output / "thermal_frame.jpg"
-        r = run_process(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(video), "-frames:v", "1", str(frame)], timeout=120)
-        if r.returncode != 0 or not frame.exists():
-            return fail("aerial-thermal-detection", "thermal-detection", "FAILED", r.stderr[-2000:] or "frame extraction failed")
-        result = run_on_image(frame, output)
+        from aerial_thermal_adapter import run_on_video
+        result = run_on_video(video, output)
         findings = result.get("findings", [])
-        return ok("aerial-thermal-detection", "thermal-detection", Path(result.get("artifact")) if result.get("artifact") else frame, "Real RT-DETR/YOLO thermal inference executed", findings=len(findings), findingRecords=findings)
+        artifact = Path(result.get("artifact")) if result.get("artifact") else output
+        return ok("aerial-thermal-detection", "thermal-detection", artifact, "Real RT-DETR/YOLO thermal inference executed across the full video", framesProcessed=len({item.get("frame") for item in findings}), findings=len(findings), findingRecords=findings)
     except Exception as exc:
         return fail("aerial-thermal-detection", "thermal-detection", "FAILED", str(exc))
 

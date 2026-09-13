@@ -55,8 +55,9 @@ def run_on_video(video_path: Path, output_dir: Path) -> dict[str, Any]:
     total_detections = 0
     track_ids = set()
     
-    # Process frames (sample every 30 frames for speed)
-    sample_rate = 30
+    # Run inference on every decoded frame. Sampling made the dashboard appear
+    # to inspect only isolated moments and discarded detections between samples.
+    sample_rate = 1
     
     while True:
         ret, frame = cap.read()
@@ -64,9 +65,6 @@ def run_on_video(video_path: Path, output_dir: Path) -> dict[str, Any]:
             break
         
         frame_count += 1
-        if frame_count % sample_rate != 0:
-            continue
-        
         # Run detection with tracking
         results = model.track(frame, conf=0.5, iou=0.45, persist=True, verbose=False)
         

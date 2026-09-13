@@ -106,7 +106,11 @@ def publish_visual_artifacts(summary: dict[str, Any], run_id: str, source_frame:
             continue
         root = Path(str(artifact))
         image_suffixes = {".jpg", ".jpeg", ".png"}
-        candidates = [root] if root.is_file() and root.suffix.lower() in image_suffixes else list(root.rglob("*.jpg")) + list(root.rglob("*.jpeg")) + list(root.rglob("*.png"))
+        video_suffixes = {".mp4", ".webm", ".mov"}
+        if root.is_file() and root.suffix.lower() in image_suffixes | video_suffixes:
+            candidates = [root]
+        else:
+            candidates = list(root.rglob("*.jpg")) + list(root.rglob("*.jpeg")) + list(root.rglob("*.png")) + list(root.rglob("*.mp4")) + list(root.rglob("*.webm")) + list(root.rglob("*.mov"))
         candidates = [path for path in candidates if path.is_file() and path.stat().st_size > 0]
         is_source_frame = not candidates
         if is_source_frame:
@@ -148,10 +152,10 @@ def publish_visual_artifacts(summary: dict[str, Any], run_id: str, source_frame:
                 pass
         prefix = "source-frame" if is_source_frame else "annotated"
         key = f"results/{run_id}/{repository}/{prefix}-{image.name}"
-        content_type = "image/png" if image.suffix.lower() == ".png" else "image/jpeg"
+        content_type = "image/png" if image.suffix.lower() == ".png" else ("video/mp4" if image.suffix.lower() == ".mp4" else ("video/webm" if image.suffix.lower() == ".webm" else ("video/quicktime" if image.suffix.lower() == ".mov" else "image/jpeg")))
         s3_client.upload_file(str(image), OBJECT_STORAGE_BUCKET, key, ExtraArgs={"ContentType": content_type})
         record["visualArtifactUri"] = f"s3://{OBJECT_STORAGE_BUCKET}/{key}"
-        record["visualArtifactKind"] = "source-frame" if is_source_frame else "annotated"
+        record["visualArtifactKind"] = "source-frame" if is_source_frame else ("annotated-video" if image.suffix.lower() in video_suffixes else "annotated")
 
 def publish_normalized_artifact(normalized: dict[str, Any], output: Path, run_id: str) -> None:
     path = output / "normalized_drift.json"
@@ -182,6 +186,7 @@ def normalize_summary(summary: dict[str, Any]) -> dict[str, Any]:
             "ran": bool(record.get("ran")),
             "artifact": record.get("artifact"),
             "visualArtifactUri": record.get("visualArtifactUri"),
+            "visualArtifactKind": record.get("visualArtifactKind"),
             "findingRecords": record.get("findingRecords", []),
         })
         for finding in record.get("findingRecords", []) or []:
