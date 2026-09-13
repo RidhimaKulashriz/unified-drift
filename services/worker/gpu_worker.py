@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -91,8 +92,12 @@ def write_inline(encoded: str | None, target: Path, label: str) -> Path | None:
     return target
 
 
-def publish_visual_artifacts(summary: dict[str, Any], run_id: str) -> None:
-    """Keep real annotated frames available after the temporary job directory is removed."""
+def publish_visual_artifacts(summary: dict[str, Any], run_id: str, source_frame: Path | None = None) -> None:
+    """Keep visual evidence available after the temporary job directory is removed.
+
+    Adapters that only emit JSON still receive the actual extracted input frame as
+    source evidence; it is never presented as an annotated detection result.
+    """
     if not s3_client:
         return
     for record in summary.get("results", []):
@@ -102,14 +107,20 @@ def publish_visual_artifacts(summary: dict[str, Any], run_id: str) -> None:
         root = Path(str(artifact))
         candidates = [root] if root.is_file() else list(root.rglob("*.jpg")) + list(root.rglob("*.jpeg")) + list(root.rglob("*.png"))
         candidates = [path for path in candidates if path.is_file() and path.stat().st_size > 0]
-        if not candidates:
-            continue
-        image = max(candidates, key=lambda path: path.stat().st_size)
+        is_source_frame = not candidates
+        if is_source_frame:
+            if source_frame is None or not source_frame.is_file() or source_frame.stat().st_size == 0:
+                continue
+            image = source_frame
+        else:
+            image = max(candidates, key=lambda path: path.stat().st_size)
         repository = str(record.get("repository", "adapter")).replace("/", "-")
-        key = f"results/{run_id}/{repository}/annotated-{image.name}"
+        prefix = "source-frame" if is_source_frame else "annotated"
+        key = f"results/{run_id}/{repository}/{prefix}-{image.name}"
         content_type = "image/png" if image.suffix.lower() == ".png" else "image/jpeg"
         s3_client.upload_file(str(image), OBJECT_STORAGE_BUCKET, key, ExtraArgs={"ContentType": content_type})
         record["visualArtifactUri"] = f"s3://{OBJECT_STORAGE_BUCKET}/{key}"
+        record["visualArtifactKind"] = "source-frame" if is_source_frame else "annotated"
 
 def publish_normalized_artifact(normalized: dict[str, Any], output: Path, run_id: str) -> None:
     path = output / "normalized_drift.json"
@@ -176,6 +187,14 @@ def process_job(message: dict[str, Any]) -> bool:
             video = download(message.get("video_uri"), work / "video.mp4")
         if thermal is None:
             thermal = download(message.get("thermal_video_uri"), work / "thermal.mp4")
+        source_frame = work / "source-frame.jpg"
+        if video is not None:
+            frame_result = subprocess.run(
+                ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(video), "-frames:v", "1", str(source_frame)],
+                capture_output=True, text=True, timeout=120,
+            )
+            if frame_result.returncode != 0 or not source_frame.is_file():
+                source_frame = None
         srt = download(message.get("srt_uri"), work / "mission.srt")
         geotiff = download(message.get("geotiff_uri"), work / "mission.tif")
         als = download(message.get("als_uri"), work / "mission.laz")
@@ -199,7 +218,7 @@ def process_job(message: dict[str, Any]) -> bool:
         if execution_mode in {"rgb12", "synthetic-demo"}:
             track = execute_rgb12(video, output / execution_mode, synthetic=execution_mode == "synthetic-demo")
             summary = {"runId": run_id, "createdAt": _now(), "totalRepositories": len(track["results"]), "results": track["results"], "mode": execution_mode}
-            publish_visual_artifacts(summary, run_id)
+            publish_visual_artifacts(summary, run_id, source_frame)
             normalized = normalize_summary(summary)
             publish_normalized_artifact(normalized, output, run_id)
             update_job(run_id, "completed", 1.0, "completed", normalized)
@@ -231,7 +250,7 @@ def process_job(message: dict[str, Any]) -> bool:
 
         summary = execute_all(args, progress_callback=pipeline_progress)
         summary["runId"] = run_id
-        publish_visual_artifacts(summary, run_id)
+        publish_visual_artifacts(summary, run_id, source_frame)
         normalized = normalize_summary(summary)
         publish_normalized_artifact(normalized, output, run_id)
         update_job(run_id, "completed", 1.0, "completed", normalized)

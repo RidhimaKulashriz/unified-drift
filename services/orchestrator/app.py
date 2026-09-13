@@ -259,7 +259,8 @@ def download_from_storage(file_key: str):
         obj = s3_client.get_object(Bucket=OBJECT_STORAGE_BUCKET, Key=file_key)
     except Exception as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return StreamingResponse(obj["Body"], media_type="application/octet-stream")
+    content_type = obj.get("ContentType") or mimetypes.guess_type(file_key)[0] or "application/octet-stream"
+    return StreamingResponse(obj["Body"], media_type=content_type)
 
 from trpc_compat import register
 register(app, submit_run, MissionSubmission, get_run)
