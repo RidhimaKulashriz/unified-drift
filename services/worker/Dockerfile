@@ -40,6 +40,6 @@ RUN mkdir -p /app/vendor /app/models && \
     curl -L --fail --retry 3 -o /var/lib/drift/tdm-cache/files/rgbt-onnx/fusion_progressive_finetune.onnx https://huggingface.co/hiuS04/RGBT-Fusion-Drone-SAR/resolve/main/fusion_progressive_finetune.onnx && \
     echo 'bf3ac91da61aca89e7a83b2cc2838dddbdc80edbc6e3b93e1402029bec13fd90  /var/lib/drift/tdm-cache/files/rgbt-onnx/fusion_progressive_finetune.onnx' | sha256sum -c - && \
     cp /var/lib/drift/tdm-cache/files/rgbt-onnx/fusion_progressive_finetune.onnx /app/models/fusion_progressive_finetune.onnx && \
-    python verify_tdm_assets.py
+    python3 verify_tdm_assets.py
 
-CMD ["bash", "-lc", "source /opt/ros/humble/setup.bash && exec python gpu_worker.py"]
+CMD ["bash", "-lc", "source /opt/ros/humble/setup.bash && exec python3 gpu_worker.py"]
