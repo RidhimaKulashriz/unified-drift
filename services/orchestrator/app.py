@@ -57,6 +57,10 @@ class MissionSubmission(BaseModel):
     arran_data_uri: str | None = None
     foundation_input_uri: str | None = None
     robot_simulation_uri: str | None = None
+    video_base64: str | None = None
+    video_file_name: str | None = None
+    thermal_video_base64: str | None = None
+    thermal_video_file_name: str | None = None
     experiment: str | None = None
     samples: int = Field(default=3, ge=1, le=100)
     enabled_modules: list[str] = Field(default_factory=list)
@@ -89,13 +93,19 @@ def health() -> dict[str, Any]:
 
 @app.post("/v1/runs")
 def submit_run(mission: MissionSubmission) -> dict[str, str]:
-    if not any(value is not None for key, value in mission.model_dump().items() if key.endswith("_uri")):
+    has_input = any(value is not None for key, value in mission.model_dump().items() if key.endswith("_uri") or key.endswith("_base64"))
+    if not has_input:
         raise HTTPException(status_code=400, detail="At least one mission input is required")
     run_id = f"DRF-{datetime.now(timezone.utc).strftime('%y%m%d')}-{uuid.uuid4().hex[:8]}"
     now = datetime.now(timezone.utc).isoformat()
-    record = {"run_id": run_id, "status": "queued", "created_at": now, "updated_at": now, "progress": 0.0, "current_stage": "queued", "input": mission.model_dump(), "results": None, "error": None}
+    payload = mission.model_dump()
+    record_input = dict(payload)
+    for key in ("video_base64", "thermal_video_base64"):
+        if record_input.get(key):
+            record_input[key] = f"<inline:{len(record_input[key])} chars>"
+    record = {"run_id": run_id, "status": "queued", "created_at": now, "updated_at": now, "progress": 0.0, "current_stage": "queued", "input": record_input, "results": None, "error": None}
     redis_client.set(f"job:{run_id}", json.dumps(record))
-    redis_client.rpush(WORKER_QUEUE_NAME, json.dumps({"run_id": run_id, **mission.model_dump()}))
+    redis_client.rpush(WORKER_QUEUE_NAME, json.dumps({"run_id": run_id, **payload}))
     return {"run_id": run_id, "status": "queued"}
 
 @app.get("/v1/runs/{run_id}")
@@ -140,3 +150,6 @@ def download_from_storage(file_key: str):
     except Exception as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return StreamingResponse(obj["Body"], media_type="application/octet-stream")
+
+from trpc_compat import register
+register(app, submit_run, MissionSubmission)
