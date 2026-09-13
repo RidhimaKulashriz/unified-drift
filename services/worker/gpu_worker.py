@@ -28,7 +28,14 @@ OBJECT_STORAGE_SECRET_KEY = os.environ.get("OBJECT_STORAGE_SECRET_KEY")
 OBJECT_STORAGE_BUCKET = os.environ.get("OBJECT_STORAGE_BUCKET", "drift-storage")
 MODEL_CACHE_DIR = Path(os.environ.get("MODEL_CACHE_DIR", "/models"))
 
-redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+redis_client = redis.from_url(
+    REDIS_URL,
+    decode_responses=True,
+    socket_connect_timeout=15,
+    socket_timeout=None,
+    health_check_interval=30,
+    retry_on_timeout=True,
+)
 s3_client = None
 if OBJECT_STORAGE_ENDPOINT:
     s3_client = boto3.client("s3", endpoint_url=OBJECT_STORAGE_ENDPOINT, aws_access_key_id=OBJECT_STORAGE_ACCESS_KEY, aws_secret_access_key=OBJECT_STORAGE_SECRET_KEY)
@@ -220,7 +227,18 @@ def health() -> dict[str, Any]:
 def main() -> int:
     logger.info("DRIFT worker starting: %s", health())
     while True:
-        item = redis_client.blpop(QUEUE, timeout=5)
+        try:
+            item = redis_client.blpop(QUEUE, timeout=5)
+        except redis.exceptions.TimeoutError:
+            logger.warning("Redis BLPOP timed out; reconnecting without dropping the worker")
+            try:
+                redis_client.connection_pool.disconnect()
+            except Exception:
+                pass
+            continue
+        except redis.exceptions.ConnectionError:
+            logger.exception("Redis connection lost; retrying worker loop")
+            continue
         if item is None:
             continue
         _, payload = item
