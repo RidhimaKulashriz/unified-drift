@@ -68,3 +68,9 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
 .visual-card-meta small { margin-top:4px; color:#777; font:8px 'DM Mono', monospace; }
 @media (max-width: 950px) { .gallery-grid { grid-template-columns:repeat(3, minmax(0,1fr)); } }
 @media (max-width: 540px) { .gallery-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } .gallery-heading { align-items:flex-start; flex-direction:column; } }
+
+/* TDM selectors: readable native controls on the dark dashboard */
+.ingest-actions select.outline-button { appearance:auto; min-width:190px; max-width:250px; height:34px; padding:0 10px; color:#e8e8e2; background:#171716; border:1px solid #55554f; border-radius:0; font:10px 'DM Mono', monospace; text-align:left; }
+.ingest-actions select.outline-button option { color:#151514; background:#f2f2ec; font:12px Arial, sans-serif; }
+.ingest-actions select.outline-button:focus { outline:2px solid #d8f59c; outline-offset:1px; }
+@media (max-width: 950px) { .ingest-actions select.outline-button { flex:1; min-width:0; max-width:none; } }
