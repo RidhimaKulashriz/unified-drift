@@ -3,41 +3,46 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 
-const execFileAsync = promisify(execFile);
+const ORCHESTRATOR_URL = process.env.DRIFT_ORCHESTRATOR_URL ?? "https://drift-orchestrator.onrender.com";
 
-async function runWorker(input: { videoBase64: string; fileName: string; thermalVideoBase64?: string }) {
-  const root = path.resolve(process.cwd());
-  const jobDir = await fs.mkdtemp(path.join(os.tmpdir(), "drift-mission-"));
-  const videoPath = path.join(jobDir, input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_"));
-  const outputDir = path.join(jobDir, "output");
-  await fs.writeFile(videoPath, Buffer.from(input.videoBase64, "base64"));
-  const args = [path.join(root, "services/worker/run_pipeline.py"), videoPath, outputDir];
-  if (input.thermalVideoBase64) {
-    const thermalPath = path.join(jobDir, "thermal-" + path.basename(videoPath));
-    await fs.writeFile(thermalPath, Buffer.from(input.thermalVideoBase64, "base64"));
-    args.push("--thermal-video", thermalPath);
+async function submitToOrchestrator(input: { videoBase64: string; fileName: string; thermalVideoBase64?: string }) {
+  const response = await fetch(`${ORCHESTRATOR_URL}/v1/runs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      video_base64: input.videoBase64,
+      video_file_name: input.fileName,
+      thermal_video_base64: input.thermalVideoBase64,
+      thermal_video_file_name: input.thermalVideoBase64 ? `thermal-${input.fileName}` : undefined,
+    }),
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`Orchestrator ${response.status}: ${text}`);
+  return JSON.parse(text) as { run_id: string; status: string };
+}
+
+async function waitForRun(runId: string) {
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    const response = await fetch(`${ORCHESTRATOR_URL}/v1/runs/${encodeURIComponent(runId)}`);
+    if (!response.ok) throw new Error(`Run status ${response.status}: ${await response.text()}`);
+    const job = await response.json() as any;
+    if (job.status === "completed") return job.results ?? job;
+    if (job.status === "failed") throw new Error(job.error ?? "Remote worker failed");
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
-  await execFileAsync("python3", args, { cwd: root, maxBuffer: 10 * 1024 * 1024 });
-  return JSON.parse(await fs.readFile(path.join(outputDir, "run.json"), "utf8"));
+  return { runId, status: "queued", findings: [], adapters: [], fusion: { outputFindingCount: 0 } };
 }
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
+      return { success: true } as const;
     }),
   }),
   mission: router({
@@ -45,15 +50,15 @@ export const appRouter = router({
       videoBase64: z.string().min(10),
       fileName: z.string().min(1).max(160),
       thermalVideoBase64: z.string().optional(),
-    })).mutation(({ input }) => runWorker(input)),
+    })).mutation(async ({ input }) => {
+      const queued = await submitToOrchestrator(input);
+      const results = await waitForRun(queued.run_id);
+      return {
+        runId: queued.run_id,
+        ...results,
+      };
+    }),
   }),
-
-  // TODO: add feature routers here, e.g.
-  // todo: router({
-  //   list: protectedProcedure.query(({ ctx }) =>
-  //     db.getUserTodos(ctx.user.id)
-  //   ),
-  // }),
 });
 
 export type AppRouter = typeof appRouter;
