@@ -129,6 +129,14 @@ export default function Home() {
   const activeCount = useMemo(() => Object.values(enabled).filter(Boolean).length, [enabled]);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+  useEffect(() => {
+    const apiBase = (import.meta.env.VITE_DRIFT_API_URL || "https://drift-orchestrator.onrender.com").replace(/\/$/, "");
+    fetch(`${apiBase}/v1/runs/latest`).then((response) => response.ok ? response.json() : null).then((job) => {
+      if (!job?.results) return;
+      const stored = { runId: job.run_id, ...job.results } as MissionResult;
+      setResult(stored); setSelectedAdapterId(stored.adapters[0]?.adapterId ?? null); setProgress(100); setStage("complete"); setActiveTab("evidence");
+    }).catch(() => undefined);
+  }, []);
 
   const handleFile = (next: File | undefined) => {
     if (!next) return;

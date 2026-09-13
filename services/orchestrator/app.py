@@ -172,6 +172,27 @@ def get_run(run_id: str) -> JobStatus:
         raise HTTPException(status_code=404, detail="Run not found")
     return JobStatus(**json.loads(raw))
 
+@app.get("/v1/runs/latest")
+def get_latest_completed_run() -> JobStatus:
+    latest: dict[str, Any] | None = None
+    cursor = 0
+    while True:
+        cursor, keys = redis_client.scan(cursor=cursor, match="job:*")
+        for key in keys:
+            raw = redis_client.get(key)
+            if not raw:
+                continue
+            candidate = json.loads(raw)
+            if candidate.get("status") != "completed" or not candidate.get("results"):
+                continue
+            if latest is None or candidate.get("updated_at", "") > latest.get("updated_at", ""):
+                latest = candidate
+        if cursor == 0:
+            break
+    if latest is None:
+        raise HTTPException(status_code=404, detail="No completed stored run is available")
+    return JobStatus(**latest)
+
 @app.get("/v1/runs/{run_id}/events")
 async def events(run_id: str):
     async def stream():
