@@ -131,7 +131,8 @@ def foundation(output: Path, experiment: str | None, input_data: Path | None) ->
     env = os.environ.copy()
     if input_data:
         env["DRIFT_INPUT_DATA"] = str(input_data)
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800, env=env, cwd=str(ROOT))
+    timeout = int(os.environ.get("DRIFT_PIPELINE_TIMEOUT_SECONDS", "300"))
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env, cwd=str(ROOT))
     if result.returncode != 0 or not executed.exists():
         return fail(repo, "notebook", "FAILED", result.stderr[-4000:] or result.stdout[-4000:], notebook=str(selected))
     return ok(repo, "notebook", executed, "Upstream archaeology notebook executed successfully", notebook=str(selected))
@@ -144,7 +145,7 @@ def adaf(output: Path, geotiff: Path | None) -> dict[str, Any]:
     notebook = VENDOR / repo / "ADAF_main.ipynb"
     if notebook.exists():
         try:
-            r = run_process(["jupyter", "nbconvert", "--to", "notebook", "--execute", str(notebook), "--output", str(output / "ADAF_main_executed.ipynb")], timeout=1800, cwd=ROOT)
+            r = run_process(["jupyter", "nbconvert", "--to", "notebook", "--execute", str(notebook), "--output", str(output / "ADAF_main_executed.ipynb")], timeout=int(os.environ.get("DRIFT_PIPELINE_TIMEOUT_SECONDS", "300")), cwd=ROOT)
             artifact = output / "ADAF_main_executed.ipynb"
             if r.returncode == 0 and artifact.exists():
                 return ok(repo, "als-lidar", artifact, "Upstream ADAF notebook executed", input=str(geotiff))
