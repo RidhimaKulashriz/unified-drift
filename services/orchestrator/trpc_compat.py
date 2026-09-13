@@ -28,8 +28,21 @@ def _success(queued: dict[str, str]) -> dict[str, Any]:
     return {"result": {"data": {"json": result}}}
 
 
-def _error(message: str) -> dict[str, Any]:
-    return {"error": {"message": message}}
+def _error(message: str, *, code: int = -32603, http_status: int = 500) -> dict[str, Any]:
+    """Match the tRPC + superjson error envelope expected by the web client."""
+    return {
+        "error": {
+            "json": {
+                "message": message,
+                "code": code,
+                "data": {
+                    "code": "INTERNAL_SERVER_ERROR" if http_status >= 500 else "BAD_REQUEST",
+                    "httpStatus": http_status,
+                    "path": "mission.run",
+                },
+            }
+        }
+    }
 
 
 def register(app, submit_run: Callable[[Any], dict[str, str]], mission_model):
@@ -43,7 +56,7 @@ def register(app, submit_run: Callable[[Any], dict[str, str]], mission_model):
             is_batch = isinstance(body, list)
             calls = body if is_batch else [body]
             if not calls:
-                return JSONResponse(status_code=400, content=_error("At least one tRPC call is required"))
+                return JSONResponse(status_code=400, content=_error("At least one tRPC call is required", code=-32600, http_status=400))
 
             responses: list[dict[str, Any]] = []
             for call in calls:
@@ -52,7 +65,7 @@ def register(app, submit_run: Callable[[Any], dict[str, str]], mission_model):
                 file_name = data.get("fileName")
                 thermal_b64 = data.get("thermalVideoBase64")
                 if not isinstance(video_b64, str) or not isinstance(file_name, str):
-                    responses.append(_error("videoBase64 and fileName are required"))
+                    responses.append(_error("videoBase64 and fileName are required", code=-32600, http_status=400))
                     continue
 
                 mission = mission_model(
