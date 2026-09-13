@@ -23,6 +23,7 @@ logger = logging.getLogger("drift-worker")
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 QUEUE = os.environ.get("WORKER_QUEUE_NAME", "drift-inference")
+ACTIVE_RUN_KEY = "drift:active_run"
 OBJECT_STORAGE_ENDPOINT = os.environ.get("OBJECT_STORAGE_ENDPOINT")
 OBJECT_STORAGE_ACCESS_KEY = os.environ.get("OBJECT_STORAGE_ACCESS_KEY")
 OBJECT_STORAGE_SECRET_KEY = os.environ.get("OBJECT_STORAGE_SECRET_KEY")
@@ -160,6 +161,10 @@ def normalize_summary(summary: dict[str, Any]) -> dict[str, Any]:
 
 def process_job(message: dict[str, Any]) -> bool:
     run_id = str(message["run_id"])
+    active_run = redis_client.get(ACTIVE_RUN_KEY)
+    if active_run and active_run != run_id:
+        logger.info("Skipping stale run %s; active run is %s", run_id, active_run)
+        return True
     work = Path(tempfile.mkdtemp(prefix=f"drift-{run_id}-"))
     output = work / "results"
     output.mkdir(parents=True, exist_ok=True)
@@ -186,6 +191,10 @@ def process_job(message: dict[str, Any]) -> bool:
             raise RuntimeError("no video input supplied")
 
         update_job(run_id, "running", 0.15, "executing selected repository pipeline")
+        active_run = redis_client.get(ACTIVE_RUN_KEY)
+        if active_run and active_run != run_id:
+            update_job(run_id, "failed", 1.0, "cancelled", error="Superseded by a newer user submission")
+            return True
         execution_mode = message.get("execution_mode", "real-upstream")
         if execution_mode in {"rgb12", "synthetic-demo"}:
             track = execute_rgb12(video, output / execution_mode, synthetic=execution_mode == "synthetic-demo")

@@ -25,6 +25,7 @@ OBJECT_STORAGE_ACCESS_KEY = os.environ.get("OBJECT_STORAGE_ACCESS_KEY")
 OBJECT_STORAGE_SECRET_KEY = os.environ.get("OBJECT_STORAGE_SECRET_KEY")
 OBJECT_STORAGE_BUCKET = os.environ.get("OBJECT_STORAGE_BUCKET", "drift-storage")
 WORKER_QUEUE_NAME = os.environ.get("WORKER_QUEUE_NAME", "drift-inference")
+ACTIVE_RUN_KEY = "drift:active_run"
 MAX_INLINE_BYTES = int(os.environ.get("MAX_INLINE_BYTES", str(256 * 1024 * 1024)))
 
 app = FastAPI(title="DRIFT Orchestrator", version="1.0")
@@ -142,12 +143,28 @@ def _clear_oversized_redis_state() -> None:
     except Exception:
         pass
 
+def _cancel_previous_runs() -> None:
+    """Keep exactly one user mission: the newest submission wins."""
+    try:
+        redis_client.delete(WORKER_QUEUE_NAME)
+        cursor = 0
+        while True:
+            cursor, keys = redis_client.scan(cursor=cursor, match="job:*")
+            if keys:
+                redis_client.delete(*keys)
+            if cursor == 0:
+                break
+    except Exception:
+        pass
+
 @app.post("/v1/runs")
 def submit_run(mission: MissionSubmission) -> dict[str, str]:
     has_input = any(value is not None for key, value in mission.model_dump().items() if key.endswith("_uri") or key.endswith("_base64"))
     if not has_input:
         raise HTTPException(status_code=400, detail="At least one mission input is required")
     run_id = f"DRF-{datetime.now(timezone.utc).strftime('%y%m%d')}-{uuid.uuid4().hex[:8]}"
+    _cancel_previous_runs()
+    redis_client.set(ACTIVE_RUN_KEY, run_id, ex=86400)
     now = datetime.now(timezone.utc).isoformat()
     payload = mission.model_dump()
     _externalize_inline(payload, run_id, "video_base64", "video_file_name", "video_uri")
