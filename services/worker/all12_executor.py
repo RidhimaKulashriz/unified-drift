@@ -175,6 +175,15 @@ def adaf(output: Path, geotiff: Path | None) -> dict[str, Any]:
     repo = "adaf"
     if geotiff is None:
         return fail(repo, "als-lidar", "INPUT_REQUIRED", "ADAF requires ALS/LiDAR-derived GeoTIFF input")
+    try:
+        from adaf_adapter import run_on_geotiff
+        result = run_on_geotiff(geotiff, output)
+        artifact = Path(result["artifact"]) if result.get("artifact") else output
+        return ok(repo, "als-lidar", artifact, "Real ADAF ALS/LiDAR inference executed", findingRecords=result.get("findings", []), model=result.get("model"), input=str(geotiff))
+    except ImportError:
+        pass
+    except Exception as exc:
+        return fail(repo, "als-lidar", "FAILED", str(exc), input=str(geotiff))
     notebook = VENDOR / repo / "ADAF_main.ipynb"
     if notebook.exists():
         try:
