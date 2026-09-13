@@ -84,6 +84,38 @@ def write_json(path: Path, payload: Any) -> Path:
     return path
 
 
+def notebook_findings(path: Path, repository: str) -> list[dict[str, Any]]:
+    """Normalize only box/score records actually emitted by an executed notebook."""
+    try:
+        notebook = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    findings: list[dict[str, Any]] = []
+    for cell in notebook.get("cells", []):
+        for output in cell.get("outputs", []):
+            payloads = []
+            if isinstance(output.get("data"), dict):
+                payloads.extend(output["data"].values())
+            if "text" in output:
+                payloads.append(output["text"])
+            for payload in payloads:
+                values = payload if isinstance(payload, list) else [payload]
+                for value in values:
+                    if not isinstance(value, dict):
+                        continue
+                    boxes = value.get("bboxPixels") or value.get("bbox") or value.get("box")
+                    score = value.get("confidence", value.get("score"))
+                    if isinstance(boxes, (list, tuple)) and len(boxes) == 4 and score is not None:
+                        findings.append({
+                            "type": "detection",
+                            "label": str(value.get("label", value.get("class", "archaeological feature"))),
+                            "confidence": float(score),
+                            "bboxPixels": list(boxes),
+                            "source": {"repository": repository, "artifact": str(path)},
+                        })
+    return findings
+
+
 def mustatil(output: Path, image: Path | None, geotiff: Path | None) -> dict[str, Any]:
     repo = "mustatil"
     if image is None:
@@ -135,7 +167,8 @@ def foundation(output: Path, experiment: str | None, input_data: Path | None) ->
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env, cwd=str(ROOT))
     if result.returncode != 0 or not executed.exists():
         return fail(repo, "notebook", "FAILED", result.stderr[-4000:] or result.stdout[-4000:], notebook=str(selected))
-    return ok(repo, "notebook", executed, "Upstream archaeology notebook executed successfully", notebook=str(selected))
+    findings = notebook_findings(executed, "github.com/juergenlandauer/FoundationModelsArchaeology")
+    return ok(repo, "notebook", executed, "Upstream archaeology notebook executed successfully", notebook=str(selected), findingRecords=findings)
 
 
 def adaf(output: Path, geotiff: Path | None) -> dict[str, Any]:
