@@ -14,7 +14,7 @@ from typing import Any
 
 import boto3
 import redis
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -197,6 +197,20 @@ def upload_to_storage(file_key: str, file_path: str) -> dict[str, str]:
         raise HTTPException(status_code=503, detail="Object storage is disabled in this deployment")
     s3_client.upload_file(file_path, OBJECT_STORAGE_BUCKET, file_key)
     return {"status": "uploaded", "uri": f"s3://{OBJECT_STORAGE_BUCKET}/{file_key}"}
+
+
+@app.post("/v1/storage/upload-file")
+def upload_file_to_storage(file: UploadFile = File(...)) -> dict[str, str]:
+    if not s3_client:
+        raise HTTPException(status_code=503, detail="Object storage is disabled in this deployment")
+    safe_name = os.path.basename(file.filename or "video.bin")
+    key = f"uploads/{uuid.uuid4().hex}/{safe_name}"
+    content_type = file.content_type or "application/octet-stream"
+    try:
+        s3_client.upload_fileobj(file.file, OBJECT_STORAGE_BUCKET, key, ExtraArgs={"ContentType": content_type})
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Object storage upload failed: {exc}") from exc
+    return {"status": "uploaded", "uri": f"s3://{OBJECT_STORAGE_BUCKET}/{key}"}
 
 @app.get("/v1/storage/objects/{file_key:path}")
 def download_from_storage(file_key: str):

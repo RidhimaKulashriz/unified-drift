@@ -44,13 +44,14 @@ type MissionResult = { runId: string; findings: Array<{ label: string; confidenc
 type Tab = "overview" | "pipeline" | "evidence";
 type Stage = "idle" | "uploading" | "queued" | "processing" | "complete" | "error";
 
-function fileToBase64(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+async function uploadMedia(file: File) {
+  const apiBase = (import.meta.env.VITE_DRIFT_API_URL || "https://drift-orchestrator.onrender.com").replace(/\/$/, "");
+  const form = new FormData();
+  form.append("file", file, file.name);
+  const response = await fetch(`${apiBase}/v1/storage/upload-file`, { method: "POST", body: form });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.detail || `Media upload failed (${response.status})`);
+  return body.uri as string;
 }
 
 const navItems: Array<{ id: Tab; icon: typeof Activity; text: string }> = [
@@ -86,9 +87,9 @@ export default function Home() {
     if (!file || running) return;
     setRunning(true); setError(""); setStage("uploading"); setProgress(8);
     try {
-      const videoBase64 = await fileToBase64(file);
+      const videoUri = await uploadMedia(file);
       setStage("queued"); setProgress(22);
-      const output = await runMutation.mutateAsync({ videoBase64, fileName: file.name, thermalVideoBase64: thermalMode ? videoBase64 : undefined, enabledModules: modules.filter((module) => enabled[module.id]).map((module) => module.id) }) as MissionResult;
+      const output = await runMutation.mutateAsync({ videoUri, fileName: file.name, thermalVideoUri: thermalMode ? videoUri : undefined, enabledModules: modules.filter((module) => enabled[module.id]).map((module) => module.id) }) as MissionResult;
       setResult(output); setStage("complete"); setProgress(100); setActiveTab("evidence");
     } catch (cause) {
       setStage("error"); setError(cause instanceof Error ? cause.message : "The worker could not complete this mission.");

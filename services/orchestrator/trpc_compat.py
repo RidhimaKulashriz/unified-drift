@@ -62,17 +62,21 @@ def register(app, submit_run: Callable[[Any], dict[str, str]], mission_model):
             for call in calls:
                 data = _unwrap_input(call)
                 video_b64 = data.get("videoBase64")
+                video_uri = data.get("videoUri")
                 file_name = data.get("fileName")
                 thermal_b64 = data.get("thermalVideoBase64")
-                if not isinstance(video_b64, str) or not isinstance(file_name, str):
-                    responses.append(_error("videoBase64 and fileName are required", code=-32600, http_status=400))
+                thermal_uri = data.get("thermalVideoUri")
+                if (not isinstance(video_b64, str) and not isinstance(video_uri, str)) or not isinstance(file_name, str):
+                    responses.append(_error("videoUri or videoBase64 and fileName are required", code=-32600, http_status=400))
                     continue
 
                 mission = mission_model(
                     video_base64=video_b64,
                     video_file_name=file_name,
+                    video_uri=video_uri,
                     thermal_video_base64=thermal_b64,
                     thermal_video_file_name=file_name if thermal_b64 else None,
+                    thermal_video_uri=thermal_uri,
                     enabled_modules=data.get("enabledModules") or [],
                 )
                 queued = submit_run(mission)

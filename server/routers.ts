@@ -6,14 +6,16 @@ import { z } from "zod";
 
 const ORCHESTRATOR_URL = process.env.DRIFT_ORCHESTRATOR_URL ?? "https://drift-orchestrator.onrender.com";
 
-async function submitToOrchestrator(input: { videoBase64: string; fileName: string; thermalVideoBase64?: string; enabledModules?: string[] }) {
+async function submitToOrchestrator(input: { videoBase64?: string; videoUri?: string; fileName: string; thermalVideoBase64?: string; thermalVideoUri?: string; enabledModules?: string[] }) {
   const response = await fetch(`${ORCHESTRATOR_URL}/v1/runs`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       video_base64: input.videoBase64,
+      video_uri: input.videoUri,
       video_file_name: input.fileName,
       thermal_video_base64: input.thermalVideoBase64,
+      thermal_video_uri: input.thermalVideoUri,
       thermal_video_file_name: input.thermalVideoBase64 ? `thermal-${input.fileName}` : undefined,
       enabled_modules: input.enabledModules ?? [],
     }),
@@ -48,11 +50,13 @@ export const appRouter = router({
   }),
   mission: router({
     run: publicProcedure.input(z.object({
-      videoBase64: z.string().min(10),
+      videoBase64: z.string().min(10).optional(),
+      videoUri: z.string().min(1).optional(),
       fileName: z.string().min(1).max(160),
       thermalVideoBase64: z.string().optional(),
+      thermalVideoUri: z.string().min(1).optional(),
       enabledModules: z.array(z.string()).optional(),
-    })).mutation(async ({ input }) => {
+    }).refine(input => Boolean(input.videoBase64 || input.videoUri), { message: "videoUri or videoBase64 is required" })).mutation(async ({ input }) => {
       const queued = await submitToOrchestrator(input);
       const results = await waitForRun(queued.run_id);
       return {

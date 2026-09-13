@@ -43,4 +43,4 @@ def test_invalid_batch_item_is_reported_without_crashing():
         json=[{"json": {"fileName": "missing-video.mp4"}}],
     )
     assert response.status_code == 200
-    assert response.json()[0]["error"]["json"]["message"] == "videoBase64 and fileName are required"
+    assert response.json()[0]["error"]["json"]["message"] == "videoUri or videoBase64 and fileName are required"
