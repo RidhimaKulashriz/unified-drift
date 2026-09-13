@@ -66,8 +66,20 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
 .visual-card-meta strong,.visual-card-meta small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .visual-card-meta strong { font-size:10px; font-weight:600; }
 .visual-card-meta small { margin-top:4px; color:#777; font:8px 'DM Mono', monospace; }
+.demo-lab { margin-top:24px; border:1px solid #292929; background:#101010; padding:17px; }
+.demo-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:9px; margin-top:12px; }
+.demo-card { min-width:0; border:1px solid #292929; background:#171716; padding:12px; }
+.demo-card-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.demo-card strong { font-size:11px; line-height:1.35; }
+.demo-card p { margin:9px 0 0; color:#8b8b85; font:9px/1.45 'DM Mono', monospace; }
+.demo-card p b { color:#cfcfc7; font-weight:400; }
+.demo-card .outline-button { margin-top:11px; width:100%; }
+.demo-ready,.demo-gated { flex:none; color:#d8f59c; font:8px 'DM Mono', monospace; }
+.demo-gated { color:#aaa; }
 @media (max-width: 950px) { .gallery-grid { grid-template-columns:repeat(3, minmax(0,1fr)); } }
 @media (max-width: 540px) { .gallery-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } .gallery-heading { align-items:flex-start; flex-direction:column; } }
+@media (max-width: 950px) { .demo-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+@media (max-width: 540px) { .demo-grid { grid-template-columns:1fr; } }
 
 /* TDM selectors: readable native controls on the dark dashboard */
 .ingest-actions select.outline-button { appearance:auto; min-width:190px; max-width:250px; height:34px; padding:0 10px; color:#e8e8e2; background:#171716; border:1px solid #55554f; border-radius:0; font:10px 'DM Mono', monospace; text-align:left; }
