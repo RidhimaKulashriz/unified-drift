@@ -13,6 +13,7 @@ async function submitToOrchestrator(input: Record<string, unknown> & { fileName:
     body: JSON.stringify({
       video_base64: input.videoBase64,
       video_uri: input.videoUri,
+      execution_mode: input.executionMode,
       video_file_name: input.fileName,
       thermal_video_base64: input.thermalVideoBase64,
       thermal_video_uri: input.thermalVideoUri,
@@ -64,6 +65,7 @@ export const appRouter = router({
     run: publicProcedure.input(z.object({
       videoBase64: z.string().min(10).optional(),
       videoUri: z.string().min(1).optional(),
+      executionMode: z.enum(["real-upstream", "rgb12", "synthetic-demo"]).optional(),
       fileName: z.string().min(1).max(160),
       thermalVideoBase64: z.string().optional(),
       thermalVideoUri: z.string().min(1).optional(),
