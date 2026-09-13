@@ -1,25 +1,19 @@
 #!/usr/bin/env python3
-"""DRIFT remote worker.
-
-The worker is intentionally thin: it downloads mission inputs, invokes the
-single strict all12 executor, uploads artifacts, and updates Redis status.
-Heavy model/runtime work stays on the remote worker.
-"""
+"""DRIFT remote worker."""
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
 import shutil
 import tempfile
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import boto3
 import redis
-from botocore.exceptions import ClientError
 
 from all12_executor import execute_all
 
@@ -37,12 +31,7 @@ MODEL_CACHE_DIR = Path(os.environ.get("MODEL_CACHE_DIR", "/models"))
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 s3_client = None
 if OBJECT_STORAGE_ENDPOINT:
-    s3_client = boto3.client(
-        "s3",
-        endpoint_url=OBJECT_STORAGE_ENDPOINT,
-        aws_access_key_id=OBJECT_STORAGE_ACCESS_KEY,
-        aws_secret_access_key=OBJECT_STORAGE_SECRET_KEY,
-    )
+    s3_client = boto3.client("s3", endpoint_url=OBJECT_STORAGE_ENDPOINT, aws_access_key_id=OBJECT_STORAGE_ACCESS_KEY, aws_secret_access_key=OBJECT_STORAGE_SECRET_KEY)
 
 
 def _now() -> str:
@@ -58,15 +47,12 @@ def update_job(run_id: str, status: str, progress: float, stage: str, results: d
     if error is not None:
         job["error"] = error
     redis_client.set(f"job:{run_id}", json.dumps(job))
-    redis_client.set(f"job_status:{run_id}", status)
 
 
 def _parse_uri(uri: str) -> tuple[str, str]:
-    if uri.startswith("s3://"):
-        value = uri[5:]
-        bucket, key = value.split("/", 1)
-        return bucket, key
-    return OBJECT_STORAGE_BUCKET, uri
+    value = uri[5:] if uri.startswith("s3://") else uri
+    bucket, key = value.split("/", 1)
+    return bucket, key
 
 
 def download(uri: str | None, target: Path) -> Path | None:
@@ -82,16 +68,18 @@ def download(uri: str | None, target: Path) -> Path | None:
     return target
 
 
-def upload(path: Path, key: str) -> str:
-    if not s3_client:
-        raise RuntimeError("OBJECT_STORAGE_ENDPOINT is not configured")
-    s3_client.upload_file(str(path), OBJECT_STORAGE_BUCKET, key)
-    return f"s3://{OBJECT_STORAGE_BUCKET}/{key}"
-
-
-def _arg(ns: dict[str, Any], key: str) -> str | None:
-    value = ns.get(key)
-    return str(value) if value else None
+def write_inline(encoded: str | None, target: Path, label: str) -> Path | None:
+    if not encoded:
+        return None
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except Exception as exc:
+        raise RuntimeError(f"invalid inline {label} payload") from exc
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(raw)
+    if not target.exists() or target.stat().st_size == 0:
+        raise RuntimeError(f"inline {label} payload is empty")
+    return target
 
 
 def process_job(message: dict[str, Any]) -> bool:
@@ -100,21 +88,28 @@ def process_job(message: dict[str, Any]) -> bool:
     output = work / "results"
     output.mkdir(parents=True, exist_ok=True)
     try:
-        update_job(run_id, "running", 0.05, "downloading inputs")
-        video = download(_arg(message, "video_uri"), work / "video.mp4")
-        thermal = download(_arg(message, "thermal_video_uri"), work / "thermal.mp4")
-        srt = download(_arg(message, "srt_uri"), work / "mission.srt")
-        geotiff = download(_arg(message, "geotiff_uri"), work / "mission.tif")
-        als = download(_arg(message, "als_uri"), work / "mission.laz")
-        rgb = download(_arg(message, "rgb_image_uri"), work / "rgb.jpg")
-        image = download(_arg(message, "image_uri"), work / "image.jpg")
-        telemetry = download(_arg(message, "telemetry_uri"), work / "telemetry.bin")
-        dem = download(_arg(message, "dem_uri"), work / "dem.tif")
-        streams = download(_arg(message, "streams_uri"), work / "streams.gpkg")
-        arran = download(_arg(message, "arran_data_uri"), work / "arran-data")
-        foundation_input = download(_arg(message, "foundation_input_uri"), work / "foundation-input")
+        update_job(run_id, "running", 0.05, "materializing inputs")
+        video = write_inline(message.get("video_base64"), work / (message.get("video_file_name") or "video.mp4"), "video")
+        thermal = write_inline(message.get("thermal_video_base64"), work / (message.get("thermal_video_file_name") or "thermal.mp4"), "thermal video")
+        if video is None:
+            video = download(message.get("video_uri"), work / "video.mp4")
+        if thermal is None:
+            thermal = download(message.get("thermal_video_uri"), work / "thermal.mp4")
+        srt = download(message.get("srt_uri"), work / "mission.srt")
+        geotiff = download(message.get("geotiff_uri"), work / "mission.tif")
+        als = download(message.get("als_uri"), work / "mission.laz")
+        rgb = download(message.get("rgb_image_uri"), work / "rgb.jpg")
+        image = download(message.get("image_uri"), work / "image.jpg")
+        telemetry = download(message.get("telemetry_uri"), work / "telemetry.bin")
+        dem = download(message.get("dem_uri"), work / "dem.tif")
+        streams = download(message.get("streams_uri"), work / "streams.gpkg")
+        arran = download(message.get("arran_data_uri"), work / "arran-data")
+        foundation_input = download(message.get("foundation_input_uri"), work / "foundation-input")
 
-        update_job(run_id, "running", 0.15, "executing all applicable upstream repositories")
+        if video is None:
+            raise RuntimeError("no video input supplied")
+
+        update_job(run_id, "running", 0.15, "executing upstream repository pipeline")
         class Args:
             pass
         args = Args()
@@ -134,13 +129,6 @@ def process_job(message: dict[str, Any]) -> bool:
         args.experiment = message.get("experiment")
         args.samples = int(message.get("samples", 3))
         summary = execute_all(args)
-
-        update_job(run_id, "running", 0.85, "uploading result artifacts")
-        uploaded: list[str] = []
-        for artifact in output.rglob("*"):
-            if artifact.is_file():
-                uploaded.append(upload(artifact, f"runs/{run_id}/{artifact.relative_to(output).as_posix()}"))
-        summary["uploadedArtifacts"] = uploaded
         update_job(run_id, "completed", 1.0, "completed", summary)
         return True
     except Exception as exc:
@@ -161,19 +149,12 @@ def health() -> dict[str, Any]:
             gpu["vramMb"] = round(torch.cuda.get_device_properties(0).total_memory / 1024 / 1024)
     except Exception as exc:
         gpu["error"] = str(exc)
-    storage = False
-    if s3_client:
-        try:
-            s3_client.head_bucket(Bucket=OBJECT_STORAGE_BUCKET)
-            storage = True
-        except Exception:
-            storage = False
     try:
         redis_client.ping()
         redis_ok = True
     except Exception:
         redis_ok = False
-    return {"worker": "remote-worker", "gpu": gpu, "redis": redis_ok, "objectStorage": storage, "modelCache": str(MODEL_CACHE_DIR), "timestamp": _now()}
+    return {"worker": "remote-worker", "gpu": gpu, "redis": redis_ok, "objectStorage": bool(s3_client), "modelCache": str(MODEL_CACHE_DIR), "timestamp": _now()}
 
 
 def main() -> int:
@@ -184,8 +165,7 @@ def main() -> int:
             continue
         _, payload = item
         try:
-            message = json.loads(payload)
-            process_job(message)
+            process_job(json.loads(payload))
         except Exception:
             logger.exception("invalid worker payload")
 
