@@ -118,14 +118,14 @@ def normalize_summary(summary: dict[str, Any]) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     for record in records:
         repo = record.get("repository", "unknown")
-        status = record.get("status", "UNKNOWN")
+        status = record.get("status") or record.get("executionStatus", "UNKNOWN")
         adapters.append({
             "adapterId": repo,
             "repository": repo,
-            "model": record.get("mode", "upstream adapter"),
+            "model": record.get("model") or record.get("mode", "upstream adapter"),
             "executionStatus": status,
-            "reason": record.get("detail", ""),
-            "contribution": record.get("detail", ""),
+            "reason": record.get("reason") or record.get("detail", ""),
+            "contribution": record.get("contribution") or record.get("reason") or record.get("detail", ""),
             "ran": bool(record.get("ran")),
             "artifact": record.get("artifact"),
             "visualArtifactUri": record.get("visualArtifactUri"),
