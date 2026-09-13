@@ -105,7 +105,8 @@ def publish_visual_artifacts(summary: dict[str, Any], run_id: str, source_frame:
         if not artifact:
             continue
         root = Path(str(artifact))
-        candidates = [root] if root.is_file() else list(root.rglob("*.jpg")) + list(root.rglob("*.jpeg")) + list(root.rglob("*.png"))
+        image_suffixes = {".jpg", ".jpeg", ".png"}
+        candidates = [root] if root.is_file() and root.suffix.lower() in image_suffixes else list(root.rglob("*.jpg")) + list(root.rglob("*.jpeg")) + list(root.rglob("*.png"))
         candidates = [path for path in candidates if path.is_file() and path.stat().st_size > 0]
         is_source_frame = not candidates
         if is_source_frame:
@@ -115,6 +116,36 @@ def publish_visual_artifacts(summary: dict[str, Any], run_id: str, source_frame:
         else:
             image = max(candidates, key=lambda path: path.stat().st_size)
         repository = str(record.get("repository", "adapter")).replace("/", "-")
+        if is_source_frame:
+            # Give every repository its own honest visual artifact. For a real
+            # detector, draw only the boxes returned by that adapter. For an
+            # input-gated/non-video repository, label the frame instead of
+            # inventing a detection.
+            try:
+                from PIL import Image, ImageDraw
+                evidence = Image.open(image).convert("RGB")
+                draw = ImageDraw.Draw(evidence)
+                findings = record.get("findingRecords", []) or []
+                for finding in findings:
+                    box = finding.get("bboxPixels") if isinstance(finding, dict) else None
+                    if not isinstance(box, (list, tuple)) or len(box) != 4:
+                        continue
+                    x1, y1, x2, y2 = [int(float(value)) for value in box]
+                    draw.rectangle((x1, y1, x2, y2), outline=(216, 245, 156), width=4)
+                    label = str(finding.get("label", "detection"))
+                    confidence = finding.get("confidence")
+                    if confidence is not None:
+                        label += f" {float(confidence):.2f}"
+                    draw.text((max(0, x1), max(0, y1 - 18)), label, fill=(216, 245, 156))
+                banner = repository if findings else f"{repository} · no compatible video detection"
+                draw.rectangle((0, 0, min(evidence.width, max(360, len(banner) * 8)), 28), fill=(10, 10, 10))
+                draw.text((8, 7), banner, fill=(216, 245, 156))
+                evidence_path = source_frame.parent / f"{repository}-evidence.jpg"
+                evidence.save(evidence_path, format="JPEG", quality=90)
+                image = evidence_path
+            except Exception:
+                # The source frame remains a valid fallback if PIL is absent.
+                pass
         prefix = "source-frame" if is_source_frame else "annotated"
         key = f"results/{run_id}/{repository}/{prefix}-{image.name}"
         content_type = "image/png" if image.suffix.lower() == ".png" else "image/jpeg"
