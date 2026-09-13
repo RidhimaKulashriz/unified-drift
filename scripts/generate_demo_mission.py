@@ -10,6 +10,10 @@ import json
 import subprocess
 from pathlib import Path
 
+import numpy as np
+import rasterio
+from rasterio.transform import from_origin
+
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "demo-mission"
 
@@ -32,6 +36,11 @@ def main() -> None:
     (OUT / "streams.geojson").write_text(json.dumps({
         "type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"demo": True}, "geometry": {"type": "LineString", "coordinates": [[46.6753, 24.7136], [46.6760, 24.7140]]}}]
     }, indent=2), encoding="utf-8")
+    transform = from_origin(46.6753, 24.7140, 0.00001, 0.00001)
+    elevation = np.arange(256, dtype=np.float32).reshape(16, 16)
+    for name in ("terrain.tif", "dem.tif"):
+        with rasterio.open(OUT / name, "w", driver="GTiff", height=16, width=16, count=1, dtype="float32", crs="EPSG:4326", transform=transform) as dataset:
+            dataset.write(elevation, 1)
     (OUT / "telemetry.json").write_text(json.dumps({"demo": True, "source": "synthetic", "vehicle": "DRIFT acceptance fixture", "latitude": 24.7136, "longitude": 46.6753}, indent=2), encoding="utf-8")
     (OUT / "arran-data.json").write_text(json.dumps({"demo": True, "annotations": [], "note": "Synthetic benchmark container; no real archaeological labels."}, indent=2), encoding="utf-8")
     (OUT / "foundation-input.json").write_text(json.dumps({"demo": True, "inputType": "synthetic satellite placeholder"}, indent=2), encoding="utf-8")

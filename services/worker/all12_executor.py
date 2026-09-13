@@ -242,8 +242,9 @@ def thermal_sar_demo(output: Path, video: Path | None) -> dict[str, Any]:
         if r.returncode != 0 or not frame.exists():
             return fail("aerial-thermal-sar-detection-demo", "thermal-sar", "FAILED", r.stderr[-2000:] or "frame extraction failed")
         result = run_on_image(frame, output)
-        artifacts = result.get("artifacts") or []
-        artifact = Path(artifacts[0]) if artifacts and Path(artifacts[0]).exists() else frame
+        artifacts = result.get("artifacts") or {}
+        artifact_values = list(artifacts.values()) if isinstance(artifacts, dict) else artifacts
+        artifact = Path(artifact_values[0]) if artifact_values and Path(artifact_values[0]).exists() else frame
         return ok("aerial-thermal-sar-detection-demo", "thermal-sar", artifact, "Upstream YOLOv12 + RT-DETRv2 inference executed", findings=len(result.get("findings", [])), findingRecords=result.get("findings", []))
     except Exception as exc:
         return fail("aerial-thermal-sar-detection-demo", "thermal-sar", "FAILED", str(exc))
@@ -253,6 +254,7 @@ def rgbt(output: Path, rgb: Path | None, thermal_video: Path | None) -> dict[str
     if rgb is None or thermal_video is None:
         return fail("rgbt-fusion-drone-sar", "rgbt-fusion", "INPUT_REQUIRED", "Provide synchronized RGB and thermal inputs")
     try:
+        output.mkdir(parents=True, exist_ok=True)
         from rgbt_fusion_adapter import run_on_image_pair
         thermal_frame = output / "rgbt_thermal.jpg"
         r = run_process(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(thermal_video), "-frames:v", "1", str(thermal_frame)], timeout=120)
@@ -339,7 +341,7 @@ def execute_all(args: argparse.Namespace) -> dict[str, Any]:
     rgbt_result = rgbt(args.output / "rgbt", args.rgb_image, args.thermal_video)
     results.append(rgbt_result)
     results.append(thermal_sar_demo(args.output / "thermal-sar", args.thermal_video))
-    findings = thermal_result.get("findings", []) if thermal_result.get("ran") else []
+    findings = thermal_result.get("findingRecords", []) if thermal_result.get("ran") else []
     results.append(geolocation(args.output / "geolocation", args.srt, findings))
     results.append(ros2(args.output / "ros2"))
     results.append(ground_station(args.output / "ground-station", args.telemetry))
