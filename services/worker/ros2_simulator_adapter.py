@@ -25,7 +25,24 @@ def execute_ros2_simulation(output_dir: Path, duration: int = 30) -> dict[str, A
         raise RuntimeError("No upstream ROS2 launch file found")
     launch = launches[0]
     log_path = output_dir / "ros2_execution.log"
-    cmd = [ros2, "launch", str(launch)]
+    # The upstream repository is a source workspace. Sourcing only /opt/ros
+    # leaves packages such as disaster_world undiscoverable (the reported
+    # PackageNotFoundError). Build and source its install overlay first.
+    install_setup = REPO_SRC / "install" / "setup.bash"
+    colcon = shutil.which("colcon")
+    if not install_setup.exists():
+        if not colcon:
+            raise RuntimeError("colcon is required to build the upstream ROS2 workspace")
+        build = subprocess.run(
+            [colcon, "build", "--symlink-install"],
+            cwd=str(REPO_SRC), capture_output=True, text=True,
+            timeout=max(duration, 120),
+        )
+        (output_dir / "ros2_colcon_build.log").write_text(build.stdout + "\n" + build.stderr, encoding="utf-8")
+        if build.returncode != 0 or not install_setup.exists():
+            raise RuntimeError(f"ROS2 workspace build failed: {build.stderr[-4000:]}")
+    command = f"source /opt/ros/humble/setup.bash && source '{install_setup}' && ros2 launch '{launch}'"
+    cmd = ["bash", "-lc", command]
     try:
         result = subprocess.run(cmd, cwd=str(REPO_SRC), capture_output=True, text=True, timeout=duration)
     except subprocess.TimeoutExpired as exc:
