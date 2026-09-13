@@ -173,7 +173,7 @@ def get_run(run_id: str) -> JobStatus:
     return JobStatus(**json.loads(raw))
 
 @app.get("/v1/runs/latest")
-def get_latest_completed_run() -> JobStatus:
+def get_latest_completed_run() -> Any:
     latest: dict[str, Any] | None = None
     cursor = 0
     while True:
@@ -190,7 +190,7 @@ def get_latest_completed_run() -> JobStatus:
         if cursor == 0:
             break
     if latest is None:
-        raise HTTPException(status_code=404, detail="No completed stored run is available")
+        return {"status": "empty", "message": "No completed stored run is available yet"}
     return JobStatus(**latest)
 
 @app.get("/v1/runs/{run_id}/events")
