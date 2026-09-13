@@ -298,11 +298,13 @@ def ros2(output: Path) -> dict[str, Any]:
     repo = "ros2-disaster-robot-sim"
     root = VENDOR / repo
     try:
-        version = run_process(["ros2", "--version"], timeout=60)
+        # ROS 2 CLI has no portable `ros2 --version` command. Listing package
+        # metadata is a valid, lightweight Humble environment smoke check.
+        version = run_process(["ros2", "pkg", "list"], timeout=60)
     except FileNotFoundError:
         return fail(repo, "ros2-simulation", "RUNTIME_REQUIRED", "Install ROS2 Humble on the Linux worker")
     if version.returncode != 0:
-        return fail(repo, "ros2-simulation", "RUNTIME_REQUIRED", version.stderr[-2000:])
+        return fail(repo, "ros2-simulation", "RUNTIME_REQUIRED", version.stderr[-2000:] or "ROS2 package environment is unavailable")
     launches = list(root.rglob("*.launch.py"))
     if not launches:
         return fail(repo, "ros2-simulation", "UPSTREAM_ENTRYPOINT_MISSING", "No ROS2 launch file found")
