@@ -16,12 +16,14 @@ import subprocess
 import sys
 import tempfile
 import time
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 VENDOR = ROOT / "vendor"
+logger = logging.getLogger("drift-executor")
 
 REPOS = [
     "mustatil",
@@ -334,6 +336,7 @@ def execute_all(args: argparse.Namespace) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     def timed(entrypoint: str, fn):
         started = time.monotonic()
+        logger.info("PIPELINE_START entrypoint=%s", entrypoint)
         try:
             record = fn()
         except Exception as exc:
@@ -341,6 +344,7 @@ def execute_all(args: argparse.Namespace) -> dict[str, Any]:
         record["entrypoint"] = entrypoint
         record["durationSeconds"] = round(time.monotonic() - started, 3)
         record.setdefault("exitCode", 0 if record.get("status") == "COMPLETED" else None)
+        logger.info("PIPELINE_END entrypoint=%s status=%s duration=%.3fs artifact=%s reason=%s", entrypoint, record.get("status"), record["durationSeconds"], record.get("artifact"), record.get("reason") or record.get("detail") or "")
         return record
     results.append(timed("mustatil", lambda: mustatil(args.output / "mustatil", args.image, args.geotiff)))
     results.append(timed("arran", lambda: arran(args.output / "arran", args.arran_data)))
