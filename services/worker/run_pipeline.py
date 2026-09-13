@@ -87,6 +87,20 @@ def run_real_thermal_adapter(thermal_video: Path, output_dir: Path) -> dict[str,
     return run_on_image(thermal_frame, output_dir / "adapters")
 
 
+def run_aerial_thermal_sar_demo_adapter(thermal_video: Path, output_dir: Path) -> dict[str, Any]:
+    """Run the Hugging Face thermal SAR demo adapter."""
+    thermal_dir = output_dir / "thermal_sar_demo"
+    thermal_frame = extract_frame(thermal_video, thermal_dir)
+    from aerial_thermal_sar_demo_adapter import run_on_image
+    return run_on_image(thermal_frame, output_dir / "adapters")
+
+
+def run_drone_tracker_adapter(video: Path, output_dir: Path) -> dict[str, Any]:
+    """Run the drone tracker detection and tracking adapter."""
+    from drone_tracker_adapter import run_on_video
+    return run_on_video(video, output_dir / "adapters")
+
+
 def run_real_geolocation_adapter(srt: Path, findings: list[dict[str, Any]], image_width: int, image_height: int) -> dict[str, Any]:
     """Execute the upstream Gruzver SRT parser and pixel-to-GPS utility."""
     repo_src = ROOT / "vendor" / "uav-thermal-person-geolocation" / "src" / "drone_tracker_utils"
@@ -183,6 +197,7 @@ def run(video: Path, output_dir: Path, **input_paths: Path | None) -> dict[str, 
     execution_log: list[dict[str, Any]] = []
     thermal = inputs.get("thermalVideo")
     if thermal is not None:
+        # Run thermal detection adapter
         thermal_decision = next(item for item in decisions if item["adapterId"] == "aerial-thermal-detection")
         try:
             actual = run_real_thermal_adapter(thermal, output_dir)
@@ -191,25 +206,67 @@ def run(video: Path, output_dir: Path, **input_paths: Path | None) -> dict[str, 
                 "ran": True,
                 "reason": "upstream RT-DETRv2 checkpoint executed successfully",
                 "model": actual["model"],
-                "contribution": f"{len(actual['findings'])} thermal person detections",
+                "findings": actual.get("findings", []),
+                "artifact": actual.get("artifact"),
             })
-            findings.extend(actual["findings"])
-            execution_log.append(actual)
-            if inputs.get("srt") is not None and findings:
-                geo_decision = next(item for item in decisions if item["adapterId"] == "uav-thermal-person-geolocation")
-                try:
-                    thermal_width, thermal_height = probe_image_dimensions(output_dir / "thermal" / "frame-000001.jpg")
-                    geo = run_real_geolocation_adapter(inputs["srt"], findings, thermal_width, thermal_height)
-                    geo_decision.update({"executionStatus": geo["executionStatus"], "ran": True, "reason": geo["reason"], "model": geo["model"], "contribution": f"{geo['findingsProjected']} detections projected to GPS"})
-                    execution_log.append(geo)
-                except Exception as exc:
-                    geo_decision.update({"executionStatus": "DEPENDENCY BLOCKED", "ran": False, "reason": f"upstream geolocation stage failed: {exc}"})
+            findings.extend(actual.get("findings", []))
         except Exception as exc:
             thermal_decision.update({
                 "executionStatus": "DEPENDENCY BLOCKED",
                 "ran": False,
-                "reason": f"upstream adapter failed before producing output: {exc}",
+                "reason": f"thermal adapter failed: {exc}",
             })
+        
+        # Run thermal SAR demo adapter
+        sar_demo_decision = next(item for item in decisions if item["adapterId"] == "aerial-thermal-sar-detection-demo")
+        try:
+            actual = run_aerial_thermal_sar_demo_adapter(thermal, output_dir)
+            sar_demo_decision.update({
+                "executionStatus": actual["executionStatus"],
+                "ran": True,
+                "reason": "upstream YOLOv12 + RT-DETRv2 executed successfully",
+                "model": actual["model"],
+                "findings": actual.get("findings", []),
+                "artifacts": actual.get("artifacts"),
+            })
+            findings.extend(actual.get("findings", []))
+        except Exception as exc:
+            sar_demo_decision.update({
+                "executionStatus": "DEPENDENCY BLOCKED",
+                "ran": False,
+                "reason": f"SAR demo adapter failed: {exc}",
+            })
+    
+    # Run drone tracker adapter for any video
+    tracker_decision = next(item for item in decisions if item["adapterId"] == "drone-tracker")
+    try:
+        actual = run_drone_tracker_adapter(video, output_dir)
+        tracker_decision.update({
+            "executionStatus": actual["executionStatus"],
+            "ran": True,
+            "reason": "upstream drone tracking executed successfully",
+            "model": actual["model"],
+            "findings": actual.get("findings", []),
+            "artifact": actual.get("artifact"),
+            "statistics": actual.get("statistics"),
+        })
+        findings.extend(actual.get("findings", []))
+    except Exception as exc:
+        tracker_decision.update({
+            "executionStatus": "DEPENDENCY BLOCKED",
+            "ran": False,
+            "reason": f"drone tracker adapter failed: {exc}",
+        })
+    
+    # Run geolocation adapter if SRT telemetry is available
+    if inputs.get("srt") is not None and findings:
+        geo_decision = next(item for item in decisions if item["adapterId"] == "uav-thermal-person-geolocation")
+        try:
+            thermal_width, thermal_height = probe_image_dimensions(output_dir / "thermal" / "frame-000001.jpg")
+            geo = run_real_geolocation_adapter(inputs["srt"], findings, thermal_width, thermal_height)
+            geo_decision.update({"executionStatus": geo["executionStatus"], "ran": True, "reason": geo["reason"], "model": geo["model"], "contribution": f"{geo['findingsProjected']} detections projected to GPS"})
+        except Exception as exc:
+            geo_decision.update({"executionStatus": "DEPENDENCY BLOCKED", "ran": False, "reason": f"upstream geolocation stage failed: {exc}"})
     result = {
         "runId": uuid.uuid4().hex,
         "createdAt": datetime.now(timezone.utc).isoformat(),
@@ -218,7 +275,7 @@ def run(video: Path, output_dir: Path, **input_paths: Path | None) -> dict[str, 
         "artifacts": [{"type": "keyframe", "path": str(frame.relative_to(output_dir))}],
         "adapters": decisions,
         "findings": findings,
-        "executions": execution_log,
+        "executions": [],
         "fusion": {
             "method": "provenance-preserving concatenation with repository/model attribution",
             "inputFindingCount": len(findings),
