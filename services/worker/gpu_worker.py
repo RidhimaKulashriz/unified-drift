@@ -16,6 +16,7 @@ import boto3
 import redis
 
 from all12_executor import execute_all
+from rgb12_track import execute_rgb12
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("drift-worker")
@@ -94,7 +95,7 @@ def publish_visual_artifacts(summary: dict[str, Any], run_id: str) -> None:
     if not s3_client:
         return
     for record in summary.get("results", []):
-        artifact = record.get("artifact")
+        artifact = record.get("artifact") or record.get("visualArtifactPath")
         if not artifact:
             continue
         root = Path(str(artifact))
@@ -128,6 +129,7 @@ def normalize_summary(summary: dict[str, Any]) -> dict[str, Any]:
             "ran": bool(record.get("ran")),
             "artifact": record.get("artifact"),
             "visualArtifactUri": record.get("visualArtifactUri"),
+            "findingRecords": record.get("findingRecords", []),
         })
         for finding in record.get("findingRecords", []) or []:
             findings.append(finding)
@@ -173,7 +175,15 @@ def process_job(message: dict[str, Any]) -> bool:
         if video is None:
             raise RuntimeError("no video input supplied")
 
-        update_job(run_id, "running", 0.15, "executing upstream repository pipeline")
+        update_job(run_id, "running", 0.15, "executing selected repository pipeline")
+        execution_mode = message.get("execution_mode", "real-upstream")
+        if execution_mode in {"rgb12", "synthetic-demo"}:
+            track = execute_rgb12(video, output / execution_mode, synthetic=execution_mode == "synthetic-demo")
+            summary = {"runId": run_id, "createdAt": _now(), "totalRepositories": len(track["results"]), "results": track["results"], "mode": execution_mode}
+            publish_visual_artifacts(summary, run_id)
+            normalized = normalize_summary(summary)
+            update_job(run_id, "completed", 1.0, "completed", normalized)
+            return True
         class Args:
             pass
         args = Args()

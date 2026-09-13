@@ -46,6 +46,7 @@ if OBJECT_STORAGE_ENDPOINT:
     )
 
 class MissionSubmission(BaseModel):
+    execution_mode: str = "real-upstream"
     video_uri: str | None = None
     thermal_video_uri: str | None = None
     rgb_image_uri: str | None = None
