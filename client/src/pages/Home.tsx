@@ -39,18 +39,18 @@ const modules = [
 ];
 
 const demoSpecs: Record<string, { input: string; detects: string; mode: string; ready: boolean; source: string; preview?: string }> = {
-  mustatil: { input: "GeoTIFF / satellite image", detects: "GIS workspace review; not video ML", mode: "Input-gated", ready: false, source: "https://github.com/tarekwasfy01/Mustatil-YOLO-AI-Model-Trainer-", preview: "/results/mustatil-official.jpg" },
+  mustatil: { input: "GeoTIFF / satellite image", detects: "GIS workspace review; not video ML", mode: "Input-gated", ready: false, source: "https://github.com/tarekwasfy01/Mustatil-YOLO-AI-Model-Trainer-" },
   "foundation-models-archaeology": { input: "Satellite / LiDAR / notebook input", detects: "Archaeological feature analysis", mode: "Input-gated", ready: false, source: "https://github.com/juergenlandauer/FoundationModelsArchaeology" },
-  adaf: { input: "ALS / LiDAR GeoTIFF", detects: "Archaeological features in terrain", mode: "Input-gated", ready: false, source: "https://github.com/EarthObservation/adaf", preview: "/results/adaf-official.jpg" },
+  adaf: { input: "ALS / LiDAR GeoTIFF", detects: "Archaeological features in terrain", mode: "Input-gated", ready: false, source: "https://github.com/EarthObservation/adaf" },
   arran: { input: "Arran benchmark dataset", detects: "Benchmark scoring, not video detection", mode: "Dataset", ready: false, source: "https://github.com/ickramer/Arran" },
   "simulated-training-data": { input: "DEM + stream vectors", detects: "Synthetic terrain/training outputs", mode: "Input-gated", ready: false, source: "https://github.com/NMC-CRS/simulated-training-data-for-archaeological-site-detection" },
   "uav-thermal-person-geolocation": { input: "Thermal video + DJI SRT", detects: "People in thermal imagery + GPS projection", mode: "Needs thermal/SRT", ready: false, source: "https://github.com/Gruzver/uav-thermal-person-geolocation" },
   "drone-tracker": { input: "RGB drone video + checkpoint", detects: "Objects / people tracking", mode: "Needs checkpoint", ready: false, source: "https://github.com/Gruzver/drone-tracker" },
   "aerial-thermal-detection": { input: "Thermal video", detects: "Thermal people/objects with YOLO/RT-DETR", mode: "Needs thermal", ready: false, source: "https://huggingface.co/collections/Kiuyha/aerial-thermal-sar-detection", preview: "https://raw.githubusercontent.com/kiuyha/Aerial-Thermal-Detection-RT-DETRv2-and-YOLOv12/HEAD/RT-DETRv2/val_batch0_pred.jpg" },
   "aerial-thermal-sar-detection-demo": { input: "Thermal image/video", detects: "Thermal SAR person detection", mode: "Needs thermal", ready: false, source: "https://huggingface.co/collections/Kiuyha/aerial-thermal-sar-detection", preview: "https://raw.githubusercontent.com/kiuyha/Aerial-Thermal-Detection-RT-DETRv2-and-YOLOv12/HEAD/YOLOv12/val_batch0_pred.jpg" },
-  "rgbt-fusion-drone-sar": { input: "Synchronized RGB + thermal", detects: "RGB-T fused objects", mode: "Needs paired inputs", ready: false, source: "https://github.com/hiungn/RGBT-Fusion-Drone-SAR", preview: "https://raw.githubusercontent.com/hiungn/RGBT-Fusion-Drone-SAR/HEAD/docs/figures/Mid_Stage.png" },
-  "ros2-disaster-robot-sim": { input: "ROS2 disaster-world simulation", detects: "Robot simulation state; not video ML", mode: "Simulator", ready: false, source: "https://github.com/newton-adhikari/ros2-disaster-robot-sim", preview: "https://raw.githubusercontent.com/newton-adhikari/ros2-disaster-robot-sim/HEAD/SystemArchitectureDisasterRobotics.jpg" },
-  "drone-control-monitoring-system": { input: "MAVLink / telemetry log", detects: "Flight/telemetry events; not video ML", mode: "Telemetry", ready: false, source: "https://github.com/thuyminh2112/Drone-control-monitoring-system", preview: "https://raw.githubusercontent.com/thuyminh2112/Drone-control-monitoring-system/HEAD/docs/images/dashboard.png" },
+  "rgbt-fusion-drone-sar": { input: "Synchronized RGB + thermal", detects: "RGB-T fused objects", mode: "Needs paired inputs", ready: false, source: "https://github.com/hiungn/RGBT-Fusion-Drone-SAR" },
+  "ros2-disaster-robot-sim": { input: "ROS2 disaster-world simulation", detects: "Robot simulation state; not video ML", mode: "Simulator", ready: false, source: "https://github.com/newton-adhikari/ros2-disaster-robot-sim" },
+  "drone-control-monitoring-system": { input: "MAVLink / telemetry log", detects: "Flight/telemetry events; no visual detections", mode: "Telemetry", ready: false, source: "https://github.com/thuyminh2112/Drone-control-monitoring-system" },
 };
 
 const tdmAssets = [
