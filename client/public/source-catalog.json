@@ -1,0 +1,32 @@
+{
+  "title": "DRIFT external source catalog",
+  "purpose": "Compatibility inputs and upstream references for the 12 real pipelines",
+  "sources": [
+    {"id":"dji-mavic-3-thermal","category":"dataset","label":"DJI Mavic 3 Thermal dataset","url":"https://zenodo.org/records/17311014","usedBy":["uav-thermal-person-geolocation","aerial-thermal-detection","aerial-thermal-sar-detection-demo"]},
+    {"id":"caltech-rgbt","category":"dataset","label":"Caltech Aerial RGB-Thermal","url":"https://data.caltech.edu/records/cks6g-ps927","usedBy":["rgbt-fusion-drone-sar"]},
+    {"id":"dji-srt","category":"telemetry","label":"DJI matching SRT telemetry","url":"https://zenodo.org/records/17311014","usedBy":["uav-thermal-person-geolocation"]},
+    {"id":"archaeoscape","category":"dataset","label":"Archaeoscape ALS/LiDAR GeoTIFF","url":"https://zenodo.org/records/14409524","usedBy":["adaf","foundation-models-archaeology"]},
+    {"id":"usgs-national-map","category":"dataset","label":"USGS DEM and stream vectors","url":"https://apps.nationalmap.gov/downloader/","usedBy":["simulated-training-data"]},
+    {"id":"arran-repository","category":"repository","label":"Arran repository","url":"https://github.com/ickramer/Arran","usedBy":["arran"]},
+    {"id":"arran-dataset","category":"dataset","label":"Arran benchmark dataset","url":"https://drive.google.com/drive/folders/1BMdKLO2vDC70PVjyR07x9esDFvESUB5Y","usedBy":["arran"]},
+    {"id":"dronekit-flight-tlog","category":"telemetry","label":"DroneKit public flight.tlog","url":"https://github.com/dronekit/dronekit-la-testdata/blob/master/flight.tlog","usedBy":["drone-control-monitoring-system"]},
+    {"id":"drone-tracker-checkpoint","category":"checkpoint","label":"Drone Tracker releases","url":"https://github.com/Gruzver/drone-tracker/releases","usedBy":["drone-tracker"]},
+    {"id":"thermal-yolov12-checkpoint","category":"checkpoint","label":"Thermal YOLOv12 best.pt","url":"https://huggingface.co/Kiuyha/yolov12-human-detection-thermal-uav/blob/main/best.pt","usedBy":["aerial-thermal-detection","aerial-thermal-sar-detection-demo"]},
+    {"id":"rgbt-onnx","category":"checkpoint","label":"RGB-T Fusion ONNX model","url":"https://huggingface.co/hiuS04/RGBT-Fusion-Drone-SAR","usedBy":["rgbt-fusion-drone-sar"]},
+    {"id":"ros2-humble","category":"runtime","label":"ROS 2 Humble","url":"https://docs.ros.org/en/humble/","usedBy":["ros2-disaster-robot-sim"]},
+    {"id":"gazebo-ros2-control","category":"runtime","label":"Gazebo / ROS2 control","url":"https://control.ros.org/humble/doc/gz_ros2_control/doc/index.html","usedBy":["ros2-disaster-robot-sim"]},
+    {"id":"hit-uav","category":"dataset","label":"HIT-UAV thermal dataset","url":"https://zenodo.org/records/7633134","usedBy":["aerial-thermal-detection","aerial-thermal-sar-detection-demo"]},
+    {"id":"drtv30k","category":"dataset","label":"DRTV30K RGB-T dataset","url":"https://github.com/Vehicle-AHU/DRTV30K","usedBy":["rgbt-fusion-drone-sar"]},
+    {"id":"mustatil","category":"repository","label":"Mustatil YOLO AI Model Trainer","url":"https://github.com/tarekwasfy01/Mustatil-YOLO-AI-Model-Trainer-/releases","usedBy":["mustatil"]},
+    {"id":"foundation-models-archaeology","category":"repository","label":"Foundation Models Archaeology","url":"https://github.com/juergenlandauer/FoundationModelsArchaeology","usedBy":["foundation-models-archaeology"]},
+    {"id":"adaf","category":"repository","label":"ADAF","url":"https://github.com/EarthObservation/adaf","usedBy":["adaf"]},
+    {"id":"simulated-training-data","category":"repository","label":"Simulated training data","url":"https://github.com/NMC-CRS/simulated-training-data-for-archaeological-site-detection","usedBy":["simulated-training-data"]},
+    {"id":"uav-thermal-geolocation","category":"repository","label":"UAV thermal person geolocation","url":"https://github.com/Gruzver/uav-thermal-person-geolocation","usedBy":["uav-thermal-person-geolocation"]},
+    {"id":"drone-tracker","category":"repository","label":"Drone Tracker","url":"https://github.com/Gruzver/drone-tracker","usedBy":["drone-tracker"]},
+    {"id":"aerial-thermal-detection","category":"repository","label":"Aerial Thermal RT-DETRv2 / YOLOv12","url":"https://github.com/kiuyha/Aerial-Thermal-Detection-RT-DETRv2-and-YOLOv12","usedBy":["aerial-thermal-detection"]},
+    {"id":"sar-demo","category":"repository","label":"Aerial Thermal SAR Detection Demo","url":"https://huggingface.co/spaces/Kiuyha/Aerial-Thermal-SAR-Detection-Demo","usedBy":["aerial-thermal-sar-detection-demo"]},
+    {"id":"rgbt-fusion-drone-sar","category":"repository","label":"RGB-T Fusion Drone SAR","url":"https://github.com/hiungn/RGBT-Fusion-Drone-SAR","usedBy":["rgbt-fusion-drone-sar"]},
+    {"id":"ros2-disaster-robot","category":"repository","label":"ROS2 Disaster Robot","url":"https://github.com/newton-adhikari/ros2-disaster-robot-sim","usedBy":["ros2-disaster-robot-sim"]},
+    {"id":"drone-ground-station","category":"repository","label":"Drone Ground Station","url":"https://github.com/thuyminh2112/Drone-control-monitoring-system","usedBy":["drone-control-monitoring-system"]}
+  ]
+}
