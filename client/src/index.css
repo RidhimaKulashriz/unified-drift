@@ -40,3 +40,13 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
 .error-banner { margin-top:11px; border:1px solid #704746; background:#1b1111; color:#e0aaa5; padding:12px 14px; display:flex; gap:9px; align-items:flex-start; font:10px/1.5 'DM Mono', monospace; }
 .pulse.error { background:#dc7770; box-shadow:0 0 0 5px rgba(220,119,112,.09); }
 @media (max-width: 950px) { .progress-sidebar { display:none; } }
+
+.adapter-sidebar { margin-top:18px; border-top:1px solid #292929; padding-top:14px; max-height:310px; overflow:auto; }
+.adapter-sidebar > .eyebrow { margin-bottom:8px; }
+.adapter-link { width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; text-align:left; color:#858580; background:transparent; border:0; border-left:2px solid transparent; padding:8px 7px; cursor:pointer; }
+.adapter-link:hover,.adapter-link.active { color:#f1f1eb; background:#171716; border-left-color:#d8f59c; }
+.adapter-link span { min-width:0; }
+.adapter-link strong,.adapter-link small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.adapter-link strong { font-size:10px; font-weight:500; }
+.adapter-link small { margin-top:3px; color:#686863; font:8px 'DM Mono', monospace; }
+.adapter-link b { color:#d8f59c; font:10px 'DM Mono', monospace; font-weight:400; }
