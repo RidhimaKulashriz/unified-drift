@@ -106,3 +106,15 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
 .detection-panel .demo-source { display:block; margin-top:10px; }
 @media (max-width: 950px) { .detection-panel-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } }
 @media (max-width: 540px) { .detection-panel-grid { grid-template-columns:1fr; } }
+
+.delhi-demo { margin-top:24px; border:1px solid #292929; background:#101010; padding:17px; }
+.delhi-demo-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+.delhi-demo article { min-width:0; border:1px solid #292929; background:#171716; padding:12px; }
+.delhi-demo video { width:100%; height:220px; object-fit:cover; background:#0b0b0b; }
+.delhi-demo h4 { margin:11px 0 7px; font-size:11px; }
+.delhi-demo p { margin:0; color:#8b8b85; font:9px/1.5 'DM Mono', monospace; }
+.delhi-image-pair { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+.delhi-image-pair figure { margin:0; }
+.delhi-image-pair img { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; background:#0b0b0b; }
+.delhi-image-pair figcaption { padding-top:5px; color:#777; font:8px 'DM Mono', monospace; }
+@media (max-width: 950px) { .delhi-demo-grid { grid-template-columns:1fr; } }
