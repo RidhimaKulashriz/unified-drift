@@ -39,15 +39,27 @@ const modules = [
   { id: "drone-control-monitoring-system", label: "Drone ground station", repo: "Drone Control Monitoring", icon: Waves, detail: "MAVLink / telemetry" },
 ];
 
+const tdmAssets = [
+  ["thermalVideoUri", "Thermal video", "thermal-video.mp4"],
+  ["srtUri", "DJI SRT telemetry", "thermal-video.SRT"],
+  ["rgbImageUri", "Synchronized RGB frame", "rgb-frame.jpg"],
+  ["geotiffUri", "ALS/LiDAR GeoTIFF fixture", "terrain.tif"],
+  ["demUri", "DEM fixture", "dem.tif"],
+  ["streamsUri", "Stream vectors", "streams.geojson"],
+  ["arranDataUri", "Arran benchmark fixture", "arran-data.json"],
+  ["foundationInputUri", "Foundation archaeology input", "foundation-input.json"],
+  ["telemetryUri", "Ground-station telemetry", "telemetry.json"],
+] as const;
+
 type Adapter = { adapterId: string; repository: string; model: string; executionStatus: string; reason: string; contribution: string; ran: boolean };
 type MissionResult = { runId: string; findings: Array<{ label: string; confidence: number; source: { repository: string; model: string } }>; adapters: Adapter[]; fusion: { outputFindingCount: number } };
 type Tab = "overview" | "pipeline" | "evidence";
 type Stage = "idle" | "uploading" | "queued" | "processing" | "complete" | "error";
 
-async function uploadMedia(file: File) {
+async function uploadMedia(file: Blob, name: string) {
   const apiBase = (import.meta.env.VITE_DRIFT_API_URL || "https://drift-orchestrator.onrender.com").replace(/\/$/, "");
   const form = new FormData();
-  form.append("file", file, file.name);
+  form.append("file", file, name);
   const response = await fetch(`${apiBase}/v1/storage/upload-file`, { method: "POST", body: form });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.detail || `Media upload failed (${response.status})`);
@@ -69,6 +81,7 @@ export default function Home() {
   const [stage, setStage] = useState<Stage>("idle");
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [thermalMode, setThermalMode] = useState(false);
+  const [tdmMode, setTdmMode] = useState(false);
   const [enabled, setEnabled] = useState<Record<string, boolean>>(() => Object.fromEntries(modules.map((module) => [module.id, true])));
   const [result, setResult] = useState<MissionResult | null>(null);
   const [error, setError] = useState("");
@@ -84,12 +97,25 @@ export default function Home() {
   };
 
   const runMission = async () => {
-    if (!file || running) return;
+    if ((!file && !tdmMode) || running) return;
+    const selectedFile = file;
     setRunning(true); setError(""); setStage("uploading"); setProgress(8);
     try {
-      const videoUri = await uploadMedia(file);
+      let videoUri: string;
+      const tdmInput: Record<string, string> = {};
+      if (tdmMode) {
+        const rgbResponse = await fetch("/tdm/rgb-video.mp4");
+        videoUri = await uploadMedia(await rgbResponse.blob(), "tdm-rgb-video.mp4");
+        for (const [field, _label, filename] of tdmAssets) {
+          const response = await fetch(`/tdm/${filename}`);
+          tdmInput[field] = await uploadMedia(await response.blob(), `tdm-${filename}`);
+        }
+      } else {
+        if (!selectedFile) throw new Error("Choose a video or select the TDM test pack");
+        videoUri = await uploadMedia(selectedFile, selectedFile.name);
+      }
       setStage("queued"); setProgress(22);
-      const output = await runMutation.mutateAsync({ videoUri, fileName: file.name, thermalVideoUri: thermalMode ? videoUri : undefined, enabledModules: modules.filter((module) => enabled[module.id]).map((module) => module.id) }) as MissionResult;
+      const output = await runMutation.mutateAsync({ videoUri, fileName: tdmMode ? "tdm-rgb-video.mp4" : selectedFile!.name, thermalVideoUri: tdmMode ? tdmInput.thermalVideoUri : thermalMode ? videoUri : undefined, ...tdmInput, enabledModules: modules.filter((module) => enabled[module.id]).map((module) => module.id) }) as MissionResult;
       setResult(output); setStage("complete"); setProgress(100); setActiveTab("evidence");
     } catch (cause) {
       setStage("error"); setError(cause instanceof Error ? cause.message : "The worker could not complete this mission.");
@@ -118,7 +144,7 @@ export default function Home() {
         </aside>
         <section className="main-stage">
           <div className="stage-heading"><div><p className="eyebrow">MISSION CONTROL / {activeTab.toUpperCase()}</p><h2>{activeTab === "evidence" ? "Evidence, without the guesswork." : activeTab === "pipeline" ? "See every stage move." : "One video. Every lens."}</h2><p className="lede">{activeTab === "pipeline" ? "A live execution ledger for the worker, adapters, and input requirements." : "Every result below comes from the worker output. No simulated detections are rendered."}</p></div><div className="heading-id"><span>RUN ID</span><strong>{result?.runId?.slice(0, 12) ?? "PENDING"}</strong></div></div>
-          <section className="ingest-card"><div className="ingest-copy"><div className="number-stamp">01</div><div><p className="eyebrow">INGEST</p><h3>{file ? file.name : "Drop drone footage here"}</h3><p>{file ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · ready to upload to secure object storage` : "MP4, MOV, AVI · choose footage, then upload and run the real pipeline"}</p></div></div><div className="ingest-actions"><input ref={inputRef} type="file" accept="video/*" hidden onChange={(event) => handleFile(event.target.files?.[0])} /><button className="outline-button" onClick={() => inputRef.current?.click()}><Upload size={16} />{file ? "Replace footage" : "Choose footage"}</button><button className={thermalMode ? "outline-button active" : "outline-button"} onClick={() => setThermalMode((value) => !value)}><Flame size={15} />{thermalMode ? "Thermal input on" : "Mark as thermal"}</button><button className="primary-button" disabled={!file || running} onClick={runMission}><Play size={15} fill="currentColor" />{running ? "Uploading & running" : "Upload & run pipeline"}</button></div></section>
+          <section className="ingest-card"><div className="ingest-copy"><div className="number-stamp">01</div><div><p className="eyebrow">INGEST</p><h3>{tdmMode ? "TDM synthetic mission pack" : file ? file.name : "Drop drone footage here"}</h3><p>{tdmMode ? "10 packaged test assets · synthetic fixtures, not field evidence" : file ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · ready to upload to secure object storage` : "MP4, MOV, AVI · choose footage, then upload and run the real pipeline"}</p></div></div><div className="ingest-actions"><input ref={inputRef} type="file" accept="video/*" hidden onChange={(event) => handleFile(event.target.files?.[0])} /><button className={tdmMode ? "outline-button active" : "outline-button"} onClick={() => setTdmMode((value) => !value)}><Database size={16} />{tdmMode ? "TDM pack selected" : "Use TDM test pack"}</button><button className="outline-button" onClick={() => inputRef.current?.click()} disabled={tdmMode}><Upload size={16} />{file ? "Replace footage" : "Choose footage"}</button><button className={thermalMode ? "outline-button active" : "outline-button"} onClick={() => setThermalMode((value) => !value)}><Flame size={15} />{thermalMode ? "Thermal input on" : "Mark as thermal"}</button><button className="primary-button" disabled={(!file && !tdmMode) || running} onClick={runMission}><Play size={15} fill="currentColor" />{running ? "Uploading & running" : "Upload & run pipeline"}</button></div></section>
           <section className="module-strip"><div className="strip-label"><p className="eyebrow">02 / MODULES</p><span>{activeCount} enabled</span></div>{modules.map((module) => { const Icon = module.icon; const isOn = enabled[module.id]; return <button key={module.id} className={isOn ? "module-card on" : "module-card"} onClick={() => setEnabled((current) => ({ ...current, [module.id]: !current[module.id] }))}><div className="module-top"><Icon size={17} /><span className={isOn ? "toggle on" : "toggle"}>{isOn ? <Check size={10} /> : <X size={10} />}</span></div><strong>{module.label}</strong><small>{module.detail}</small><code>{statusFor(module.id)}</code></button>; })}</section>
           <section className="analysis-grid"><div className="viewer-panel"><div className="panel-head"><div><p className="eyebrow">03 / LIVE EVIDENCE</p><h3>Frame analysis</h3></div><span className="frame-counter"><Video size={13} /> {result ? `${result.findings.length} normalized findings` : "awaiting worker"}</span></div><div className="video-stage">{preview ? <video src={preview} controls muted className="uploaded-video" /> : <div className="empty-video"><FileVideo size={30} /><span>Preview appears here after upload</span><small>Real annotated output is written by the worker</small></div>}</div><div className="scrub"><span>0%</span><div className="scrub-line"><div style={{ width: `${progress}%` }} /></div><span>{progress}%</span></div></div>
             <div className="signal-panel"><div className="panel-head"><div><p className="eyebrow">04 / EXECUTION LEDGER</p><h3>{activeTab === "evidence" ? "Findings & provenance" : "Topic execution status"}</h3></div><span className="live-pill">{running ? "PROCESSING" : result ? "VERIFIED" : "STAGED"}</span></div><div className="signal-list">{activeTab === "evidence" && visibleFindings.length ? visibleFindings.map((finding, index) => <div className="signal-item" key={`${finding.label}-${index}`}><span className="signal-icon"><Radar size={15} /></span><div><strong>{finding.label}</strong><small>{finding.source.model} · provenance preserved</small></div><b>{finding.confidence.toFixed(2)}</b></div>) : result ? result.adapters.map((adapter) => <div className="signal-item" key={adapter.adapterId}><span className="signal-icon"><Database size={15} /></span><div><strong>{topicFor(adapter.adapterId)}</strong><small>{adapter.model} · {adapter.reason}</small></div><b className={adapter.ran ? "good" : "muted"}>{adapter.executionStatus}</b></div>) : <div className="signal-item"><span className="signal-icon"><Database size={15} /></span><div><strong>No worker result yet</strong><small>Upload input and run the actual pipeline</small></div><b>—</b></div>}</div><div className="signal-footer"><span><Database size={13} /> findings / provenance-preserved JSON</span><button className="download-button"><Download size={13} /> export bundle</button></div></div></section>

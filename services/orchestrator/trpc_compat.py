@@ -78,6 +78,18 @@ def register(app, submit_run: Callable[[Any], dict[str, str]], mission_model, ge
                     thermal_video_base64=thermal_b64,
                     thermal_video_file_name=file_name if thermal_b64 else None,
                     thermal_video_uri=thermal_uri,
+                    rgb_image_uri=data.get("rgbImageUri"),
+                    image_uri=data.get("imageUri"),
+                    srt_uri=data.get("srtUri"),
+                    telemetry_uri=data.get("telemetryUri"),
+                    mavlink_uri=data.get("mavlinkUri"),
+                    geotiff_uri=data.get("geotiffUri"),
+                    als_uri=data.get("alsUri"),
+                    dem_uri=data.get("demUri"),
+                    streams_uri=data.get("streamsUri"),
+                    arran_data_uri=data.get("arranDataUri"),
+                    foundation_input_uri=data.get("foundationInputUri"),
+                    robot_simulation_uri=data.get("robotSimulationUri"),
                     enabled_modules=data.get("enabledModules") or [],
                 )
                 queued = submit_run(mission)

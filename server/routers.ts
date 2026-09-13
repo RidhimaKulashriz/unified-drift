@@ -6,7 +6,7 @@ import { z } from "zod";
 
 const ORCHESTRATOR_URL = process.env.DRIFT_ORCHESTRATOR_URL ?? "https://drift-orchestrator.onrender.com";
 
-async function submitToOrchestrator(input: { videoBase64?: string; videoUri?: string; fileName: string; thermalVideoBase64?: string; thermalVideoUri?: string; enabledModules?: string[] }) {
+async function submitToOrchestrator(input: Record<string, unknown> & { fileName: string }) {
   const response = await fetch(`${ORCHESTRATOR_URL}/v1/runs`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -16,6 +16,18 @@ async function submitToOrchestrator(input: { videoBase64?: string; videoUri?: st
       video_file_name: input.fileName,
       thermal_video_base64: input.thermalVideoBase64,
       thermal_video_uri: input.thermalVideoUri,
+      rgb_image_uri: input.rgbImageUri,
+      image_uri: input.imageUri,
+      srt_uri: input.srtUri,
+      telemetry_uri: input.telemetryUri,
+      mavlink_uri: input.mavlinkUri,
+      geotiff_uri: input.geotiffUri,
+      als_uri: input.alsUri,
+      dem_uri: input.demUri,
+      streams_uri: input.streamsUri,
+      arran_data_uri: input.arranDataUri,
+      foundation_input_uri: input.foundationInputUri,
+      robot_simulation_uri: input.robotSimulationUri,
       thermal_video_file_name: input.thermalVideoBase64 ? `thermal-${input.fileName}` : undefined,
       enabled_modules: input.enabledModules ?? [],
     }),
@@ -55,6 +67,18 @@ export const appRouter = router({
       fileName: z.string().min(1).max(160),
       thermalVideoBase64: z.string().optional(),
       thermalVideoUri: z.string().min(1).optional(),
+      rgbImageUri: z.string().min(1).optional(),
+      imageUri: z.string().min(1).optional(),
+      srtUri: z.string().min(1).optional(),
+      telemetryUri: z.string().min(1).optional(),
+      mavlinkUri: z.string().min(1).optional(),
+      geotiffUri: z.string().min(1).optional(),
+      alsUri: z.string().min(1).optional(),
+      demUri: z.string().min(1).optional(),
+      streamsUri: z.string().min(1).optional(),
+      arranDataUri: z.string().min(1).optional(),
+      foundationInputUri: z.string().min(1).optional(),
+      robotSimulationUri: z.string().min(1).optional(),
       enabledModules: z.array(z.string()).optional(),
     }).refine(input => Boolean(input.videoBase64 || input.videoUri), { message: "videoUri or videoBase64 is required" })).mutation(async ({ input }) => {
       const queued = await submitToOrchestrator(input);
