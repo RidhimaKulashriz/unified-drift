@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -45,7 +46,7 @@ def _error(message: str, *, code: int = -32603, http_status: int = 500) -> dict[
     }
 
 
-def register(app, submit_run: Callable[[Any], dict[str, str]], mission_model):
+def register(app, submit_run: Callable[[Any], dict[str, str]], mission_model, get_run: Callable[[str], Any] | None = None):
     @app.post("/api/trpc/{procedure}")
     async def trpc_compat(request: Request, procedure: str):
         if procedure != "mission.run":
@@ -80,7 +81,22 @@ def register(app, submit_run: Callable[[Any], dict[str, str]], mission_model):
                     enabled_modules=data.get("enabledModules") or [],
                 )
                 queued = submit_run(mission)
-                responses.append(_success(queued))
+                if get_run is None:
+                    responses.append(_success(queued))
+                    continue
+                deadline = asyncio.get_running_loop().time() + 15 * 60
+                while True:
+                    job = get_run(queued["run_id"])
+                    status = getattr(job, "status", None)
+                    if status == "completed":
+                        results = getattr(job, "results", None) or {}
+                        responses.append({"result": {"data": {"json": {"runId": queued["run_id"], **results}}}})
+                        break
+                    if status == "failed":
+                        raise RuntimeError(getattr(job, "error", None) or "Remote worker failed")
+                    if asyncio.get_running_loop().time() >= deadline:
+                        raise RuntimeError("The worker did not complete this mission within 15 minutes")
+                    await asyncio.sleep(1)
 
             if is_batch:
                 return JSONResponse(content=responses)

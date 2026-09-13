@@ -223,4 +223,4 @@ def download_from_storage(file_key: str):
     return StreamingResponse(obj["Body"], media_type="application/octet-stream")
 
 from trpc_compat import register
-register(app, submit_run, MissionSubmission)
+register(app, submit_run, MissionSubmission, get_run)
