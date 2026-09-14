@@ -96,7 +96,7 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
 .detection-panel-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:9px; margin-top:12px; }
 .detection-panel { min-width:0; border:1px solid #292929; background:#171716; overflow:hidden; }
 .detection-panel-media { min-height:126px; background:#0d0d0d; border-bottom:1px solid #292929; }
-.detection-panel-media img, .detection-panel-media video, .detection-panel-media iframe { display:block; width:100%; height:126px; border:0; object-fit:cover; filter:saturate(.8); }
+.detection-panel-media img, .detection-panel-media video { display:block; width:100%; height:126px; border:0; object-fit:cover; filter:saturate(.8); }
 .detection-panel-media .visual-empty { min-height:126px; aspect-ratio:auto; }
 .detection-panel-body { padding:12px; }
 .panel-index { color:#d8f59c; font:9px 'DM Mono', monospace; }
