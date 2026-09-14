@@ -161,3 +161,5 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
 .hero-source-grid strong { display:block; margin-top:9px; font-size:11px; }
 .hero-source-grid small { display:block; margin-top:5px; color:#777; font:8px/1.4 'DM Mono',monospace; }
 @media (max-width: 640px) { .hero-source-grid { grid-template-columns:1fr; } }
+.source-link { color:#d8f59c; text-decoration:none; cursor:pointer; }
+.source-link:hover { text-decoration:underline; color:#f1d58c; }
