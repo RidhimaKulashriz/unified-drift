@@ -155,3 +155,9 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
 .legend-real { color:#baffc9; }
 .legend-demo { color:#f1d58c; border-color:#8b6f39 !important; }
 .hero-note { color:#8b8b85; font:9px/1.5 'DM Mono',monospace; max-width:900px; margin:12px 0 0; }
+.hero-source-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:12px; }
+.hero-source-grid article { border:1px solid #292929; background:#171716; padding:10px; }
+.hero-source-grid video { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; background:#050605; }
+.hero-source-grid strong { display:block; margin-top:9px; font-size:11px; }
+.hero-source-grid small { display:block; margin-top:5px; color:#777; font:8px/1.4 'DM Mono',monospace; }
+@media (max-width: 640px) { .hero-source-grid { grid-template-columns:1fr; } }
