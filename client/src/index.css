@@ -178,3 +178,16 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
 @media (max-width: 540px) { .source-library-grid { grid-template-columns:1fr; } }
 .inline-source-badge { display:inline-block; margin-top:8px; padding:4px 6px; border:1px solid #59634a; color:#d8f59c; font:7px 'DM Mono',monospace; }
 .source-card-media video { display:block; width:100%; height:100%; object-fit:cover; background:#090a09; }
+.inline-video-library { margin-top:24px; border:1px solid #394235; background:#101010; padding:18px; }
+.inline-video-library .gallery-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; border-bottom:1px solid #292929; padding-bottom:12px; }
+.inline-video-library .gallery-heading > span { color:#a9bb78; font:8px 'DM Mono',monospace; letter-spacing:.08em; text-align:right; }
+.inline-video-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:14px; }
+.inline-video-card { min-width:0; border:1px solid #292929; background:#171716; overflow:hidden; }
+.inline-video-card video { display:block; width:100%; height:132px; object-fit:cover; background:#080908; border-bottom:1px solid #292929; }
+.inline-video-card > div { min-height:76px; padding:10px 11px 12px; }
+.inline-video-card .panel-index { display:inline-block; color:#d8f59c; font:8px 'DM Mono',monospace; }
+.inline-video-card h4 { margin:7px 0 6px; color:#f0f0e8; font-size:11px; line-height:1.25; font-weight:600; }
+.inline-video-card small { display:block; min-height:24px; color:#777; font:7px/1.4 'DM Mono',monospace; }
+@media (max-width: 1050px) { .inline-video-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (max-width: 760px) { .inline-video-library .gallery-heading { display:block; } .inline-video-library .gallery-heading > span { display:block; margin-top:8px; text-align:left; } .inline-video-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width: 520px) { .inline-video-grid { grid-template-columns:1fr; } .inline-video-card video { height:190px; } }
