@@ -126,3 +126,5 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
 .video-result-overlay span { color:#d0d0c8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .video-result-overlay b { font-weight:400; white-space:nowrap; }
 .detection-panel-media .result-frame { display:block; width:100%; height:126px; object-fit:cover; border-bottom:1px solid #292929; filter:saturate(.85); }
+
+.result-embed { display:block; width:100%; height:126px; border:0; background:#0d0d0d; }
