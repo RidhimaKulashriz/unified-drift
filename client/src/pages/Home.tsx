@@ -62,10 +62,10 @@ const inlineVideoSources: Record<string, string> = {
   adaf: "/reference-videos/adaf.webm", // Zenodo 1470770 DEM/orthomosaic archive
   arran: "/reference-videos/arran.webm", // Zenodo 6370315: MOTS dataset ZIP
   "simulated-training-data": "/user-sources/caltech-aerial-rgbt.mp4", // Zenodo 20596728: 3d_net_rgbt.zip
-  "uav-thermal-person-geolocation": "/reference-videos/thermal-person-geolocation.mp4", // Zenodo 21515906: browser-compatible local MP4
+  "uav-thermal-person-geolocation": "/reference-videos/thermal-person-geolocation-h264.mp4", // Zenodo 21515906: browser-compatible local MP4
   "drone-tracker": "/reference-videos/drone-tracker.mp4", // Zenodo 13907798: local browser-compatible tracking reference
   "aerial-thermal-detection": "/reference-videos/thermal-detection-result.mp4", // Zenodo 10467489: local browser-compatible thermal reference
-  "aerial-thermal-sar-detection-demo": "/reference-videos/thermal-sar-person.mp4", // Zenodo 6370315: browser-compatible local MOTS reference
+  "aerial-thermal-sar-detection-demo": "/reference-videos/thermal-sar-person-h264.mp4", // Zenodo 6370315: browser-compatible local MOTS reference
   "rgbt-fusion-drone-sar": "/reference-videos/rgbt-fusion.mp4", // Zenodo 12773422: FireMan-UAV-RGBT.zip
   "ros2-disaster-robot-sim": "https://zenodo.org/api/records/7469011/files/inference_count_night_Drone.mp4/content",
   "drone-control-monitoring-system": "/user-sources/heritage-detection-demo.mp4", // deblussers.com demo is a web/Gazebo page
