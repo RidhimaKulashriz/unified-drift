@@ -191,3 +191,32 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
 @media (max-width: 1050px) { .inline-video-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media (max-width: 760px) { .inline-video-library .gallery-heading { display:block; } .inline-video-library .gallery-heading > span { display:block; margin-top:8px; text-align:left; } .inline-video-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width: 520px) { .inline-video-grid { grid-template-columns:1fr; } .inline-video-card video { height:190px; } }
+
+.drone-lens-experience { margin-top:24px; border:1px solid #59634a; background:#0d0f0d; padding:18px; }
+.drone-lens-experience .gallery-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; border-bottom:1px solid #292929; padding-bottom:12px; }
+.drone-lens-experience .gallery-heading > span { color:#d8f59c; font:8px 'DM Mono',monospace; letter-spacing:.08em; }
+.drone-video-switch { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+.drone-lens-tabs { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:7px; margin-top:10px; }
+.drone-lens-tab { min-height:62px; border:1px solid #292929; background:#171716; color:#9b9b92; text-align:left; padding:8px; cursor:pointer; }
+.drone-lens-tab.active { border-color:#d8f59c; background:#232a1e; color:#f0f0e8; }
+.drone-lens-tab strong { display:block; font:9px 'DM Mono',monospace; }
+.drone-lens-tab small { display:block; margin-top:5px; font:7px/1.3 'DM Mono',monospace; color:#777; }
+.drone-lens-stage { position:relative; margin-top:14px; min-height:300px; background:#050605; overflow:hidden; border:1px solid #394235; }
+.drone-lens-stage > video { display:block; width:100%; max-height:620px; aspect-ratio:16/9; object-fit:contain; background:#050605; }
+.drone-overlay { position:absolute; inset:0; pointer-events:none; font:9px 'DM Mono',monospace; }
+.drone-overlay-status,.drone-overlay-counter { position:absolute; top:10px; padding:6px 8px; background:rgba(5,8,5,.86); border:1px solid #d8f59c; color:#d8f59c; }
+.drone-overlay-status { left:10px; max-width:55%; }
+.drone-overlay-counter { right:10px; color:#f1d58c; border-color:#8b6f39; }
+.drone-overlay-box { position:absolute; border:2px solid #d8f59c; background:rgba(130,170,90,.08); padding:4px; color:#d8f59c; min-width:120px; }
+.drone-overlay-box b,.drone-overlay-box small { display:block; text-shadow:0 1px #000; }
+.drone-overlay-box small { margin-top:3px; color:#fff; }
+.box-one { left:26%; top:29%; width:19%; height:24%; }
+.box-two { left:58%; top:42%; width:16%; height:18%; border-color:#f1d58c; color:#f1d58c; }
+.lens-thermal .drone-overlay-box { border-color:#ff875c; color:#ffb08e; box-shadow:0 0 24px rgba(255,80,40,.28); }
+.lens-thermal .drone-lens-stage > video { filter:sepia(.55) saturate(1.9) hue-rotate(320deg) contrast(1.15); }
+.lens-sar .drone-overlay-box { border-color:#f1d58c; color:#f1d58c; }
+.lens-archaeology .drone-overlay-box { border-color:#c5a77a; color:#e0c69a; }
+.lens-infrastructure .drone-overlay-box { border-color:#8ec9ff; color:#a7d7ff; }
+.drone-overlay-trail { position:absolute; left:35%; top:50%; width:25%; height:2px; background:#d8f59c; transform:rotate(-18deg); box-shadow:0 0 8px #d8f59c; }
+@media (max-width: 900px) { .drone-lens-tabs { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (max-width: 560px) { .drone-lens-experience .gallery-heading { display:block; } .drone-lens-experience .gallery-heading > span { display:block; margin-top:8px; } .drone-lens-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); } .drone-overlay-status { max-width:70%; font-size:7px; } .drone-overlay-counter { top:auto; bottom:8px; left:8px; right:auto; font-size:7px; } }
