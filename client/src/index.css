@@ -118,3 +118,7 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
 .delhi-image-pair img { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; background:#0b0b0b; }
 .delhi-image-pair figcaption { padding-top:5px; color:#777; font:8px 'DM Mono', monospace; }
 @media (max-width: 950px) { .delhi-demo-grid { grid-template-columns:1fr; } }
+.result-badge { position:absolute; left:8px; bottom:8px; z-index:2; background:rgba(11,11,11,.9); border:1px solid #59634a; color:#d8f59c; padding:5px 7px; font:8px 'DM Mono', monospace; letter-spacing:.04em; }
+.result-badge.actual { border-color:#d8f59c; }
+.detection-panel-media { position:relative; }
+.result-note { display:block; margin-top:7px; color:#8b8b85; font:8px/1.4 'DM Mono', monospace; }
