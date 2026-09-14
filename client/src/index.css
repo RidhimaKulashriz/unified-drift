@@ -176,3 +176,5 @@ button:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
 .source-card-body .source-link { display:inline-block; margin-top:8px; font:8px 'DM Mono',monospace; }
 @media (max-width: 950px) { .source-library-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width: 540px) { .source-library-grid { grid-template-columns:1fr; } }
+.inline-source-badge { display:inline-block; margin-top:8px; padding:4px 6px; border:1px solid #59634a; color:#d8f59c; font:7px 'DM Mono',monospace; }
+.source-card-media video { display:block; width:100%; height:100%; object-fit:cover; background:#090a09; }
