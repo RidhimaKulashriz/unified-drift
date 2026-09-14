@@ -756,8 +756,10 @@
   // Periodic reporting
   setInterval(reportLogs, CONFIG.reportInterval);
 
-  // Report on page unload
-  window.addEventListener("beforeunload", function () {
+  // Report when the page is hidden. The preview document disallows
+  // `beforeunload` via Permissions Policy, and pagehide covers navigation
+  // and tab closure without prompting or blocking the page.
+  function reportOnPageHide() {
     var consoleLogs = store.consoleLogs;
     var networkRequests = store.networkRequests;
     var uiEvents = store.uiEvents;
@@ -797,7 +799,8 @@
       }
       navigator.sendBeacon(CONFIG.reportEndpoint, payloadStr);
     }
-  });
+  }
+  window.addEventListener("pagehide", reportOnPageHide);
 
   // ==========================================================================
   // Initialization
